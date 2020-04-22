@@ -1,0 +1,21 @@
+version: "3.4"
+services:
+  ct-diag-server:
+    build:
+      context: .
+    environment:
+      POSTGRES_DSN: "postgres://ct-diag:${POSTGRES_PASSWORD}@postgres:5432?sslmode=disable"
+    restart: on-failure
+    depends_on:
+      - postgres
+    ports:
+      - "8080:80"
+
+  postgres:
+    image: postgres:11.7
+    restart: always
+    environment:
+      POSTGRES_USER: ct-diag
+      POSTGRES_PASSWORD:
+    ports:
+      - "5432:5432"
