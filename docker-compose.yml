@@ -12,7 +12,7 @@ services:
       - "8080:80"
 
   postgres:
-    image: postgres:11.7
+    image: postgres:11.7-alpine
     restart: always
     environment:
       POSTGRES_USER: ct-diag
