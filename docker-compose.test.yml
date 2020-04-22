@@ -1,0 +1,12 @@
+version: "3.4"
+services:
+  postgres-test:
+    image: postgres:11.7
+    restart: always
+    environment:
+      POSTGRES_USER: ct-diag-test
+      POSTGRES_PASSWORD: ct-diag-test
+    volumes:
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "54321:5432"

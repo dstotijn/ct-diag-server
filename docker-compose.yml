@@ -17,5 +17,7 @@ services:
     environment:
       POSTGRES_USER: ct-diag
       POSTGRES_PASSWORD:
+    volumes:
+      - ./create-db.sh:/docker-entrypoint-initdb.d/create-db.s
     ports:
       - "5432:5432"
