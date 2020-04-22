@@ -46,6 +46,18 @@ jobs: # basic units of work in a run
             PACKAGE_NAMES=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
             gotestsum --junitfile ${TEST_RESULTS}/gotestsum-report.xml -- $PACKAGE_NAMES
 
+      - run: GO111MODULE=off go get github.com/mattn/goveralls
+
+      - run:
+          name: Gather coverage
+          environment:
+            POSTGRES_DSN: "postgres://circleci-demo-go:circleci-demo-go@localhost:5432/circle_test?sslmode=disable"
+          command: go test -v -cover -race -coverprofile=${TEST_RESULTS}/coverage.out ./...
+
+      - run:
+          name: Send coverage to Coveralls
+          command: goveralls -coverprofile=${TEST_RESULTS}/coverage.out -service=circle-ci -repotoken=${COVERALLS_REPO_TOKEN}
+
       - run: make # pull and build dependencies for the project
 
       - save_cache:
