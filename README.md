@@ -41,9 +41,10 @@ Diagnosis Keys.
 
 ## TODO
 
-- Design and implement spec for creation of short lived OTPs for health care
-  professionals, to be used as a bearer token for device users to authenticate
-  the `POST` request for uploading Diagnosis Keys.
+- [ ] Add tests for HTTP handlers.
+- [ ] Design and implement spec for creation of short lived OTPs for health care
+      professionals, to be used as a bearer token for device users to authenticate
+      the `POST` request for uploading Diagnosis Keys.
 
 ## Status
 
