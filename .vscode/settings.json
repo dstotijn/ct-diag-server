@@ -1,0 +1,6 @@
+{
+  "go.testEnvVars": {
+    "POSTGRES_DSN": "postgres://ct-diag-test:ct-diag-test@127.0.0.1:54321/ct-diag-test?sslmode=disable"
+  },
+  "go.testFlags": ["-v"]
+}
