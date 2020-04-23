@@ -1,5 +1,7 @@
 FROM golang:1.14-alpine
 
+ENV POSTGRES_DSN=postgres://localhost:5432/ct-diag
+
 WORKDIR /go/src/ct-diag-server
 COPY . .
 
