@@ -45,6 +45,10 @@ Diagnosis Keys.
 - [ ] Design and implement spec for creation of short lived OTPs for health care
       professionals, to be used as a bearer token for device users to authenticate
       the `POST` request for uploading Diagnosis Keys.
+- [ ] Write docs for the API, include sample usage (code).
+- [ ] Add benchmarks.
+- [ ] Add `since` query parameter to `listDiagnosisKeys` endpoint to allow
+      offsetting the Diagnosis Key list to minimize data size.
 
 ## Status
 
