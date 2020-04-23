@@ -6,7 +6,7 @@
 [![GoDoc](https://godoc.org/github.com/dstotijn/ct-diag-server?status.svg)](https://godoc.org/github.com/dstotijn/ct-diag-server)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dstotijn/ct-diag-server)](https://goreportcard.com/report/github.com/dstotijn/ct-diag-server)
 
-> **ct-diag-server** is an server written in Go for storing and retrieving
+> **ct-diag-server** is a server written in Go for storing and retrieving
 > Diagnosis Keys, as defined in Apple/Google's [draft specification](https://www.apple.com/covid19/contacttracing/)
 > of its Contact Tracing Framework. It aims to respect the privacy of its users
 > and store only the bare minimum of data needed for anonymous contact tracing.
