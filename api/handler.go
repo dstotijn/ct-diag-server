@@ -43,6 +43,7 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 	}
 
 	if len(diagKeys) == 0 {
+		w.Header().Set("Content-Length", "0")
 		return
 	}
 
