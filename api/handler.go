@@ -27,7 +27,7 @@ func NewHandler(repo diag.Repository) http.Handler {
 	router.GET("/diagnosis-keys", h.listDiagnosisKeys)
 	router.POST("/diagnosis-keys", h.postDiagnosisKeys)
 	router.GET("/health", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		w.Write([]byte("OK"))
+		fmt.Fprint(w, "OK")
 	})
 
 	return router
@@ -125,7 +125,7 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 		return
 	}
 
-	fmt.Fprintf(w, "OK")
+	fmt.Fprint(w, "OK")
 }
 
 func writeInternalErrorResp(w http.ResponseWriter, err error) {
