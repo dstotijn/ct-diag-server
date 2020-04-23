@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -28,6 +30,30 @@ func (ts testRepository) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag
 
 func (ts testRepository) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
 	return ts.findAllDiagnosisKeysFn(ctx)
+}
+
+func TestHealth(t *testing.T) {
+	handler := NewHandler(nil)
+	req := httptest.NewRequest("GET", "http://example.com/health", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+	resp := w.Result()
+
+	expStatusCode := 200
+	if got := resp.StatusCode; got != expStatusCode {
+		t.Errorf("expected: %v, got: %v", expStatusCode, got)
+	}
+
+	expBody := "OK"
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := strings.TrimSpace(string(body)); got != expBody {
+		t.Errorf("expected: %v, got: `%s`", expBody, got)
+	}
 }
 
 func TestListDiagnosisKeys(t *testing.T) {
@@ -147,5 +173,253 @@ func TestListDiagnosisKeys(t *testing.T) {
 		if got := strings.TrimSpace(string(body)); got != expBody {
 			t.Errorf("expected: %v, got: `%s`", expBody, got)
 		}
+	})
+}
+
+func TestPostDiagnosisKeys(t *testing.T) {
+	t.Run("missing post body", func(t *testing.T) {
+		handler := NewHandler(nil)
+		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", nil)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+		resp := w.Result()
+
+		expStatusCode := 400
+		if got := resp.StatusCode; got != expStatusCode {
+			t.Errorf("expected: %v, got: %v", expStatusCode, got)
+		}
+
+		expBody := "Request body is missing"
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := strings.TrimSpace(string(body)); got != expBody {
+			t.Errorf("expected: %v, got: `%s`", expBody, got)
+		}
+	})
+
+	t.Run("incomplete diagnosis key", func(t *testing.T) {
+		handler := NewHandler(nil)
+		body := bytes.NewReader([]byte{0x00})
+		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", body)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+		resp := w.Result()
+
+		expStatusCode := 400
+		if got := resp.StatusCode; got != expStatusCode {
+			t.Errorf("expected: %v, got: %v", expStatusCode, got)
+		}
+
+		expBody := "Invalid diagnosis key: unexpected EOF"
+		resBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := strings.TrimSpace(string(resBody)); got != expBody {
+			t.Errorf("expected: %v, got: `%s`", expBody, got)
+		}
+	})
+
+	t.Run("missing day number", func(t *testing.T) {
+		handler := NewHandler(nil)
+		key, err := hex.DecodeString("8A79100D60F943C48C01FC96A156EE50")
+		if err != nil {
+			panic(err)
+		}
+
+		body := bytes.NewReader(key)
+		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", body)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+		resp := w.Result()
+
+		expStatusCode := 400
+		if got := resp.StatusCode; got != expStatusCode {
+			t.Errorf("expected: %v, got: %v", expStatusCode, got)
+		}
+
+		expBody := "Invalid day number: EOF"
+		resBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := strings.TrimSpace(string(resBody)); got != expBody {
+			t.Errorf("expected: %v, got: `%s`", expBody, got)
+		}
+	})
+
+	t.Run("invalid day number", func(t *testing.T) {
+		handler := NewHandler(nil)
+		buf, err := hex.DecodeString("8A79100D60F943C48C01FC96A156EE59" + "04") // UUID + `4` as hex
+		if err != nil {
+			panic(err)
+		}
+
+		body := bytes.NewReader(buf)
+		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", body)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+		resp := w.Result()
+
+		expStatusCode := 400
+		if got := resp.StatusCode; got != expStatusCode {
+			t.Errorf("expected: %v, got: %v", expStatusCode, got)
+		}
+
+		expBody := "Invalid day number: unexpected EOF"
+		resBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := strings.TrimSpace(string(resBody)); got != expBody {
+			t.Errorf("expected: %v, got: `%s`", expBody, got)
+		}
+	})
+
+	t.Run("too many diagnosis keys", func(t *testing.T) {
+		diagKey := diag.DiagnosisKey{
+			Key:       uuid.New(),
+			DayNumber: uint16(42),
+		}
+
+		repo := testRepository{
+			storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
+				return errors.New("foobar")
+			},
+		}
+		handler := NewHandler(repo)
+
+		buf := &bytes.Buffer{}
+		for i := 0; i < maxBatchSize+1; i++ {
+			_, err := buf.Write(diagKey.Key[:])
+			if err != nil {
+				panic(err)
+			}
+			err = binary.Write(buf, binary.BigEndian, diagKey.DayNumber)
+			if err != nil {
+				panic(err)
+			}
+		}
+		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", buf)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+		resp := w.Result()
+
+		expStatusCode := 413
+		if got := resp.StatusCode; got != expStatusCode {
+			t.Errorf("expected: %v, got: %v", expStatusCode, got)
+		}
+
+		expBody := "Request Entity Too Large"
+		resBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := strings.TrimSpace(string(resBody)); got != expBody {
+			t.Fatalf("expected: %v, got: `%s`", expBody, got)
+		}
+	})
+
+	t.Run("valid diagnosis key", func(t *testing.T) {
+		expDiagKeys := []diag.DiagnosisKey{
+			{
+				Key:       uuid.New(),
+				DayNumber: uint16(42),
+			},
+		}
+
+		validBody := func() *bytes.Buffer {
+			buf := &bytes.Buffer{}
+			for _, expDiagKey := range expDiagKeys {
+				_, err := buf.Write(expDiagKey.Key[:])
+				if err != nil {
+					panic(err)
+				}
+				err = binary.Write(buf, binary.BigEndian, expDiagKey.DayNumber)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			return buf
+		}
+
+		t.Run("diag.Service returns nil error", func(t *testing.T) {
+			var storedDiagKeys []diag.DiagnosisKey
+			repo := testRepository{
+				storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
+					storedDiagKeys = diagKeys
+					return nil
+				},
+			}
+			handler := NewHandler(repo)
+
+			req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", validBody())
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+			resp := w.Result()
+
+			expStatusCode := 200
+			if got := resp.StatusCode; got != expStatusCode {
+				t.Errorf("expected: %v, got: %v", expStatusCode, got)
+			}
+
+			expBody := "OK"
+			resBody, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got := strings.TrimSpace(string(resBody)); got != expBody {
+				t.Fatalf("expected: %v, got: `%s`", expBody, got)
+			}
+
+			if !reflect.DeepEqual(storedDiagKeys, expDiagKeys) {
+				t.Errorf("expected: %#v, got: %#v", expDiagKeys, storedDiagKeys)
+			}
+		})
+
+		t.Run("diag.Service returns unexpected error", func(t *testing.T) {
+			repo := testRepository{
+				storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
+					return errors.New("foobar")
+				},
+			}
+			handler := NewHandler(repo)
+
+			req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", validBody())
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+			resp := w.Result()
+
+			expStatusCode := 500
+			if got := resp.StatusCode; got != expStatusCode {
+				t.Errorf("expected: %v, got: %v", expStatusCode, got)
+			}
+
+			expBody := "Internal Server Error"
+			resBody, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got := strings.TrimSpace(string(resBody)); got != expBody {
+				t.Fatalf("expected: %v, got: `%s`", expBody, got)
+			}
+		})
 	})
 }
