@@ -6,7 +6,7 @@
 [![GoDoc](https://godoc.org/github.com/dstotijn/ct-diag-server?status.svg)](https://godoc.org/github.com/dstotijn/ct-diag-server)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dstotijn/ct-diag-server)](https://goreportcard.com/report/github.com/dstotijn/ct-diag-server)
 
-> **ct-diag-server** is a HTTP server written in Go for storing and retrieving
+> **ct-diag-server** is an HTTP server written in Go for storing and retrieving
 > Diagnosis Keys, as defined in Apple/Google's [draft specification](https://www.apple.com/covid19/contacttracing/)
 > of its Contact Tracing Framework. It aims to respect the privacy of its users
 > and store only the bare minimum of data needed for anonymous contact tracing.
@@ -22,7 +22,7 @@ Diagnosis Keys.
 - Privacy first: Don't store or log any personally identifiable information.
 - Built for high availability:
   - Aims to have a small memory footprint.
-  - Retrieval of diagnosis keyset as a bytestream, easily cachable by CDN.
+  - Retrieval of Diagnosis Keys as a bytestream, easily cachable by CDN.
   - Ships with a Dockerfile, for easy deployment as a workload on a wide range
     of hosting platforms.
 - Security: rely on Go's standard library where possible, minimal usage of vendor
@@ -30,7 +30,7 @@ Diagnosis Keys.
 - Solid test coverage, for easy auditing and review.
 - Ships with PostgreSQL adapter for storage of Diagnosis Keys, but can easily be
   forked for new adapters.
-- Liberal license, easily forkable for other developers.
+- Permissive [license](LICENSE), easily forkable for other developers.
 
 ## Features
 
@@ -38,6 +38,8 @@ Diagnosis Keys.
   bytestreams for sending and receiving as little data as possible over the
   wire: 16 bytes per _Diagnosis Key_, 2 bytes per _Day Number_.
 - PostgreSQL support for storage.
+
+---
 
 ## API reference
 
@@ -62,21 +64,20 @@ A `500 Internal Server Error` response indicates server failure, and warrants a 
 
 | Name                                     | Description                                                                  |
 | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `Content-Type: application/octet-stream` | The HTTP response is a byte stream (see below).                              |
+| `Content-Type: application/octet-stream` | The HTTP response is a bytestream of Diagnosis Keys (see below).             |
 | `Content-Length: {n * 18}`               | Content length is `n * 18`, where `n` is the amount of found Diagnosis Keys. |
 
 #### Response body
 
 The HTTP response body is a bytestream of Diagnosis Keys. A diagnosis key consists
 of two parts: the key data itself (16 bytes), and 2 bytes (big endian) to denote
-the _Day Number_; the day since Unix Epoch (see [this note](diag/diag.go#L20) on
+the _Day Number_; the day since Unix Epoch (see [this note](diag/diag.go#L22) on
 why 2 bytes was chosen and what the consequence is). Because the amount of bytes
 per diagnosis key is fixed, there is no delimiter.
 
 ### Uploading Diagnosis Keys
 
 To be used for uploading a set of Diagnosis Keys by a mobile client device.
-
 **Note:** There currently is no authentication, nor is there a means to obtain
 and compute a bearer token. See [TODO](#todo).
 
@@ -120,4 +121,4 @@ The project is currently under active development.
 
 [MIT](LICENSE)
 
-(c) 2020 David Stotijn
+© 2020 David Stotijn
