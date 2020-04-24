@@ -58,7 +58,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	defer stmt.Close()
 
 	for _, diagKey := range diagKeys {
-		_, err = stmt.ExecContext(ctx, diagKey.Key, diagKey.DayNumber)
+		_, err = stmt.ExecContext(ctx, diagKey.Key[:], diagKey.DayNumber)
 		if err != nil {
 			return fmt.Errorf("postgres: could not execute statement: %v", err)
 		}
@@ -84,10 +84,12 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 
 	for rows.Next() {
 		var diagKey diag.DiagnosisKey
-		err := rows.Scan(&diagKey.Key, &diagKey.DayNumber)
+		key := make([]byte, 16)
+		err := rows.Scan(&key, &diagKey.DayNumber)
 		if err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}
+		copy(diagKey.Key[:], key)
 		diagKeys = append(diagKeys, diagKey)
 	}
 	rows.Close()

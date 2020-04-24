@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dstotijn/ct-diag-server/diag"
-	"github.com/google/uuid"
 )
 
 var client *Client
@@ -39,6 +38,7 @@ func TestMain(m *testing.M) {
 
 func TestStoreDiagnosisKeys(t *testing.T) {
 	ctx := context.Background()
+	key := [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 
 	tests := []struct {
 		name        string
@@ -55,13 +55,13 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			name: "valid diagnosis keyset",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					Key:       key,
 					DayNumber: uint16(42),
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					Key:       key,
 					DayNumber: uint16(42),
 				},
 			},
@@ -71,17 +71,17 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			name: "duplicate diagnosis keyset",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					Key:       key,
 					DayNumber: uint16(42),
 				},
 				{
-					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					Key:       key,
 					DayNumber: uint16(42),
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					Key:       key,
 					DayNumber: uint16(42),
 				},
 			},
@@ -111,10 +111,12 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 
 			for rows.Next() {
 				var diagKey diag.DiagnosisKey
-				err := rows.Scan(&diagKey.Key, &diagKey.DayNumber)
+				key := make([]byte, 16)
+				err := rows.Scan(&key, &diagKey.DayNumber)
 				if err != nil {
 					t.Fatal(err)
 				}
+				copy(diagKey.Key[:], key)
 				diagKeys = append(diagKeys, diagKey)
 			}
 			rows.Close()
@@ -133,6 +135,7 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 
 func TestFindAllDiagnosisKeys(t *testing.T) {
 	ctx := context.Background()
+	key := [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 
 	_, err := client.db.ExecContext(ctx, "TRUNCATE diagnosis_keys")
 	if err != nil {
@@ -155,13 +158,13 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			name: "diagnosis keys in database",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					Key:       key,
 					DayNumber: uint16(42),
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					Key:       key,
 					DayNumber: uint16(42),
 				},
 			},
@@ -184,7 +187,7 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			defer stmt.Close()
 
 			for _, diagKey := range tt.diagKeys {
-				_, err = stmt.ExecContext(ctx, diagKey.Key, diagKey.DayNumber)
+				_, err = stmt.ExecContext(ctx, diagKey.Key[:], diagKey.DayNumber)
 				if err != nil {
 					t.Fatal(err)
 				}

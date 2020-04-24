@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"github.com/dstotijn/ct-diag-server/diag"
-	"github.com/google/uuid"
 )
 
 type testRepository struct {
@@ -83,7 +82,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 	t.Run("diagnosis keys found", func(t *testing.T) {
 		expDiagKeys := []diag.DiagnosisKey{
 			{
-				Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+				Key:       [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 				DayNumber: uint16(42),
 			},
 		}
@@ -113,16 +112,11 @@ func TestListDiagnosisKeys(t *testing.T) {
 		var got []diag.DiagnosisKey
 
 		for {
-			keyBuf := make([]byte, 16)
-			_, err := resp.Body.Read(keyBuf)
+			var key [16]byte
+			_, err := io.ReadFull(resp.Body, key[:])
 			if err == io.EOF {
 				break
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			key, err := uuid.FromBytes(keyBuf)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -256,12 +250,11 @@ func TestPostDiagnosisKeys(t *testing.T) {
 
 	t.Run("invalid day number", func(t *testing.T) {
 		handler := NewHandler(nil)
-		buf, err := hex.DecodeString("8A79100D60F943C48C01FC96A156EE59" + "04") // UUID + `4` as hex
-		if err != nil {
-			panic(err)
-		}
 
-		body := bytes.NewReader(buf)
+		body := bytes.NewBuffer([]byte{
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, // Key
+			4, // Missing byte for day number
+		})
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", body)
 		w := httptest.NewRecorder()
 
@@ -286,7 +279,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 
 	t.Run("too many diagnosis keys", func(t *testing.T) {
 		diagKey := diag.DiagnosisKey{
-			Key:       uuid.New(),
+			Key:       [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 			DayNumber: uint16(42),
 		}
 
@@ -333,7 +326,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 	t.Run("valid diagnosis key", func(t *testing.T) {
 		expDiagKeys := []diag.DiagnosisKey{
 			{
-				Key:       uuid.New(),
+				Key:       [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 				DayNumber: uint16(42),
 			},
 		}
