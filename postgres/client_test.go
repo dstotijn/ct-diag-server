@@ -90,7 +90,6 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-
 		_, err := client.db.ExecContext(ctx, "TRUNCATE diagnosis_keys")
 		if err != nil {
 			t.Fatal(err)

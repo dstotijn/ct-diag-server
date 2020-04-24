@@ -50,8 +50,8 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, day_number) VALUES ($1, $2)" +
-		"ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING")
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, day_number) VALUES ($1, $2)
+	ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING`)
 	if err != nil {
 		return err
 	}
