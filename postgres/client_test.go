@@ -40,11 +40,6 @@ func TestMain(m *testing.M) {
 func TestStoreDiagnosisKeys(t *testing.T) {
 	ctx := context.Background()
 
-	_, err := client.db.ExecContext(ctx, "TRUNCATE diagnosis_keys")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	tests := []struct {
 		name        string
 		diagKeys    []diag.DiagnosisKey
@@ -72,9 +67,34 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			},
 			expError: nil,
 		},
+		{
+			name: "duplicate diagnosis keyset",
+			diagKeys: []diag.DiagnosisKey{
+				{
+					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					DayNumber: uint16(42),
+				},
+				{
+					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					DayNumber: uint16(42),
+				},
+			},
+			expDiagKeys: []diag.DiagnosisKey{
+				{
+					Key:       uuid.MustParse("adc69f96-c83f-4c2b-8905-ddf2b6ba8543"),
+					DayNumber: uint16(42),
+				},
+			},
+			expError: nil,
+		},
 	}
 
 	for _, tt := range tests {
+		_, err := client.db.ExecContext(ctx, "TRUNCATE diagnosis_keys")
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
 			err := client.StoreDiagnosisKeys(ctx, tt.diagKeys)
 			if err != tt.expError {
@@ -126,7 +146,7 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 		expError    error
 	}{
 		{
-			name:        "no diagnosis keys in dataabase",
+			name:        "no diagnosis keys in database",
 			diagKeys:    nil,
 			expDiagKeys: nil,
 			expError:    nil,
