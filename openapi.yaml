@@ -1,0 +1,116 @@
+openapi: 3.0.3
+info:
+  title: ct-diag-server
+  description: |-
+    [![CircleCI](https://circleci.com/gh/dstotijn/ct-diag-server.svg?style=shield)](https://circleci.com/gh/dstotijn/ct-diag-server)
+    [![Coverage Status](https://coveralls.io/repos/github/dstotijn/ct-diag-server/badge.svg?branch=master)](https://coveralls.io/github/dstotijn/ct-diag-server?branch=master)
+    [![GitHub](https://img.shields.io/github/license/dstotijn/ct-diag-server)](LICENSE)
+    [![GoDoc](https://godoc.org/github.com/dstotijn/ct-diag-server?status.svg)](https://godoc.org/github.com/dstotijn/ct-diag-server)
+    [![Go Report Card](https://goreportcard.com/badge/github.com/dstotijn/ct-diag-server)](https://goreportcard.com/report/github.com/dstotijn/ct-diag-server)
+
+    **ct-diag-server** is an HTTP server written in Go for storing and retrieving
+    Diagnosis Keys, as defined in Apple/Google's [draft specification](https://www.apple.com/covid19/contacttracing/)
+    of its Contact Tracing Framework. It aims to respect the privacy of its users
+    and store only the bare minimum of data needed for anonymous contact tracing.
+
+    In anticipation of the general release of Apple and Google's native APIs (planned
+    for May 2020), this application provides a bare bones implementation for the
+    framework's server component: a central repository for submitting Diagnosis Keys
+    after a positive test, and retrieving a collection of all previously submitted
+    Diagnosis Keys.
+  contact:
+    name: David Stotijn
+    email: dstotijn@gmail.com
+  license:
+    name: MIT
+    url: https://github.com/dstotijn/ct-diag-server/blob/master/LICENSE
+  version: 0.4.0
+externalDocs:
+  url: https://github.com/dstotijn/ct-diag-server
+servers:
+  - url: https://ct-reference.codefor.nl/
+    description: Server hosted by [Code for NL](https://www.codefor.nl/).
+paths:
+  /diagnosis-keys:
+    get:
+      description: |
+        To be used for fetching a list of Diagnosis Keys. A typical client is either a mobile device, or an intermediate platform/server of an app developer, for manual/custom distribution of the payload to clients. In either case, the keyset can be regarded as public; it doesn't contain PII.
+
+        The HTTP response body is a bytestream of Diagnosis Keys. A diagnosis key consists
+        of two parts: the key data itself (16 bytes), and 2 bytes (big endian) to denote
+        the _Day Number_; the day since Unix Epoch (see [this note](https://github.com/dstotijn/ct-diag-server/diag/diag.go#L22) on
+        why 2 bytes was chosen and what the consequence is). Because the amount of bytes
+        per diagnosis key is fixed, there is no delimiter.
+      responses:
+        "200":
+          description: Successful response
+          headers:
+            Content-Length:
+              description:
+                Is `n * 18`, where `n` is the amount of found Diagnosis
+                Keys.
+              style: simple
+              explode: false
+              schema:
+                type: integer
+                example: 18000
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "500":
+          description: Unexpected error
+          content:
+            text/plain; charset=utf-8:
+              schema:
+                type: string
+                example: Internal Server Error
+    post:
+      description: |-
+        To be used for uploading a set of Diagnosis Keys by a mobile client device.
+
+        **Note:** There currently is no authentication, nor is there a means to obtain
+        and compute a bearer token. See [TODO](https://github.com/dstotijn/ct-diag-server#todo).
+
+        The HTTP request body should be a bytestream of `1 <= 14` Diagnosis Keys. A diagnosis key consists of two parts: the key data itself (16 bytes), and 2 bytes (big endian) to denote the _Day Number_ (see above). Because the amount of bytes per diagnosis key is fixed, there is no delimiter.
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Client error
+          content:
+            text/plain; charset=utf-8:
+              schema:
+                type: string
+                example: "Invalid day number: unexpected EOF"
+        "500":
+          description: Unexpected error
+          content:
+            text/plain; charset=utf-8:
+              schema:
+                type: string
+                example: Internal Server Error
+  /health:
+    get:
+      description: Health check. To be used for checking if the server is operational.
+      responses:
+        "200":
+          description: Successful response
+          content:
+            text/plain; charset=utf-8:
+              schema:
+                type: string
+                example: OK
+components: {}

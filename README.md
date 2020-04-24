@@ -43,6 +43,10 @@ Diagnosis Keys.
 
 ## API reference
 
+💡 Check out the [OpenAPI reference](https://app.swaggerhub.com/apis/dstotijn84/ct-diag-server)
+or import [openapi.yaml](openapi.yaml) in a compatible client for exploring the
+API and creating client code stubs.
+
 ### Listing Diagnosis Keys
 
 To be used for fetching a list of Diagnosis Keys. A typical client is either a mobile
