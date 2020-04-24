@@ -3,8 +3,6 @@ package diag
 import (
 	"context"
 	"errors"
-
-	"github.com/google/uuid"
 )
 
 // ErrNilDiagKeys is used when an empty diagnosis keyset is used.
@@ -18,7 +16,7 @@ var ErrNilDiagKeys = errors.New("diagnosis key array cannot be empty")
 //
 // @see https://covid19-static.cdn-apple.com/applications/covid19/current/static/contact-tracing/pdf/ContactTracing-BluetoothSpecificationv1.1.pdf
 type DiagnosisKey struct {
-	Key       uuid.UUID
+	Key       [16]byte
 	DayNumber uint16 // Using uint16 saves data, but it will break the server on Jun 7, 2149.
 }
 

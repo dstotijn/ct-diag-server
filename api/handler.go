@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/dstotijn/ct-diag-server/diag"
-	"github.com/google/uuid"
 )
 
 const maxBatchSize = 60
@@ -59,11 +58,11 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	// 18 bytes per diagnosis key: 16 bytes (UUID) + 2 bytes (uint16).
+	// 18 bytes per diagnosis key: 16 bytes (key) + 2 bytes (day number).
 	w.Header().Set("Content-Length", strconv.Itoa(len(diagKeys)*18))
 
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
-	// written with the diagnosis key itself (UUID), and 2 bytes for its day
+	// written with the diagnosis key itself, and 2 bytes for its day
 	// number (uint16, big endian). Because both parts have a fixed length,
 	// there is no delimiter.
 	for i := range diagKeys {
@@ -85,8 +84,8 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	diagKeys := make([]diag.DiagnosisKey, 0, maxBatchSize)
 
 	for {
-		keyBuf := make([]byte, 16)
-		_, err := io.ReadFull(r.Body, keyBuf)
+		var key [16]byte
+		_, err := io.ReadFull(r.Body, key[:])
 		if err == io.EOF {
 			break
 		}
@@ -99,16 +98,6 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 			code := http.StatusRequestEntityTooLarge
 			http.Error(w, http.StatusText(code), code)
 			return
-		}
-
-		var key uuid.UUID
-		copy(key[:], keyBuf)
-
-		if version := key.Version(); version != 4 {
-			http.Error(w, fmt.Sprintf("Invalid UUID version: %s", version), http.StatusBadRequest)
-		}
-		if variant := key.Variant(); variant != uuid.RFC4122 {
-			http.Error(w, fmt.Sprintf("Invalid UUID variant: %s", variant), http.StatusBadRequest)
 		}
 
 		dayNumBuf := make([]byte, 2)
