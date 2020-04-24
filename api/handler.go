@@ -10,7 +10,6 @@ import (
 
 	"github.com/dstotijn/ct-diag-server/diag"
 	"github.com/google/uuid"
-	"github.com/julienschmidt/httprouter"
 )
 
 const maxBatchSize = 60
@@ -23,18 +22,28 @@ type handler struct {
 func NewHandler(repo diag.Repository) http.Handler {
 	h := handler{diagSvc: diag.NewService(repo)}
 
-	router := httprouter.New()
-	router.GET("/diagnosis-keys", h.listDiagnosisKeys)
-	router.POST("/diagnosis-keys", h.postDiagnosisKeys)
-	router.GET("/health", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		fmt.Fprint(w, "OK")
-	})
+	mux := http.NewServeMux()
 
-	return router
+	mux.HandleFunc("/diagnosis-keys", h.diagnosisKeys)
+	mux.HandleFunc("/health", h.health)
+
+	return mux
+}
+
+// diagnosisKeys handles both GET and POST requests
+func (h *handler) diagnosisKeys(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.listDiagnosisKeys(w, r)
+	case http.MethodPost:
+		h.postDiagnosisKeys(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
 }
 
 // listDiagnosisKeys writes all diagnosis keys as binary data in the HTTP response.
-func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	diagKeys, err := h.diagSvc.FindAllDiagnosisKeys(r.Context())
 	if err != nil {
 		log.Printf("api: error finding all diagnosis keys: %v", err)
@@ -72,7 +81,7 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 }
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.
-func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	diagKeys := make([]diag.DiagnosisKey, 0, maxBatchSize)
 
 	for {
@@ -125,6 +134,11 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 		return
 	}
 
+	fmt.Fprint(w, "OK")
+}
+
+// health writes OK in the HTTP response.
+func (h *handler) health(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "OK")
 }
 
