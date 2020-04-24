@@ -8,7 +8,6 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strconv"
@@ -120,8 +119,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 				break
 			}
 			if err != nil {
-				http.Error(w, "Invalid body", http.StatusBadRequest)
-				return
+				t.Fatal(err)
 			}
 
 			key, err := uuid.FromBytes(keyBuf)
