@@ -27,7 +27,7 @@ func NewHandler(repo diag.Repository) http.Handler {
 	router.GET("/diagnosis-keys", h.listDiagnosisKeys)
 	router.POST("/diagnosis-keys", h.postDiagnosisKeys)
 	router.GET("/health", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		w.Write([]byte("OK"))
+		fmt.Fprint(w, "OK")
 	})
 
 	return router
@@ -43,6 +43,7 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 	}
 
 	if len(diagKeys) == 0 {
+		w.Header().Set("Content-Length", "0")
 		return
 	}
 
@@ -76,12 +77,12 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 
 	for {
 		keyBuf := make([]byte, 16)
-		_, err := r.Body.Read(keyBuf)
+		_, err := io.ReadFull(r.Body, keyBuf)
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			http.Error(w, "Invalid body", http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("Invalid diagnosis key: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -91,22 +92,23 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 			return
 		}
 
-		key, err := uuid.FromBytes(keyBuf)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Invalid UUID: %v", err), http.StatusBadRequest)
-			return
+		var key uuid.UUID
+		copy(key[:], keyBuf)
+
+		if version := key.Version(); version != 4 {
+			http.Error(w, fmt.Sprintf("Invalid UUID version: %s", version), http.StatusBadRequest)
+		}
+		if variant := key.Variant(); variant != uuid.RFC4122 {
+			http.Error(w, fmt.Sprintf("Invalid UUID variant: %s", variant), http.StatusBadRequest)
 		}
 
-		var dayNumber uint16
-		err = binary.Read(r.Body, binary.BigEndian, &dayNumber)
-		if err == io.EOF {
-			http.Error(w, "Missing day number", http.StatusBadRequest)
-			return
-		}
+		dayNumBuf := make([]byte, 2)
+		_, err = io.ReadFull(r.Body, dayNumBuf)
 		if err != nil {
-			http.Error(w, "Invalid day number", http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("Invalid day number: %v", err), http.StatusBadRequest)
 			return
 		}
+		dayNumber := binary.BigEndian.Uint16(dayNumBuf)
 
 		diagKeys = append(diagKeys, diag.DiagnosisKey{Key: key, DayNumber: dayNumber})
 	}
@@ -122,6 +124,8 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request, _ ht
 		writeInternalErrorResp(w, err)
 		return
 	}
+
+	fmt.Fprint(w, "OK")
 }
 
 func writeInternalErrorResp(w http.ResponseWriter, err error) {
