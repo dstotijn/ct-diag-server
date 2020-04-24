@@ -11,8 +11,6 @@ import (
 	"github.com/dstotijn/ct-diag-server/diag"
 )
 
-const maxBatchSize = 60
-
 type handler struct {
 	diagSvc diag.Service
 }
@@ -81,7 +79,7 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.
 func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
-	diagKeys := make([]diag.DiagnosisKey, 0, maxBatchSize)
+	diagKeys := make([]diag.DiagnosisKey, 0, diag.MaxUploadBatchSize)
 
 	for {
 		var key [16]byte
@@ -94,7 +92,7 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if len(diagKeys) == maxBatchSize {
+		if len(diagKeys) == diag.MaxUploadBatchSize {
 			code := http.StatusRequestEntityTooLarge
 			http.Error(w, http.StatusText(code), code)
 			return

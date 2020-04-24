@@ -291,7 +291,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 		handler := NewHandler(repo)
 
 		buf := &bytes.Buffer{}
-		for i := 0; i < maxBatchSize+1; i++ {
+		for i := 0; i < diag.MaxUploadBatchSize+1; i++ {
 			_, err := buf.Write(diagKey.Key[:])
 			if err != nil {
 				panic(err)

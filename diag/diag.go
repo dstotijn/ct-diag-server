@@ -5,6 +5,10 @@ import (
 	"errors"
 )
 
+// MaxUploadBatchSize is the maximum amount of diagnosis keys to be
+// uploaded per request.
+const MaxUploadBatchSize = 14
+
 // ErrNilDiagKeys is used when an empty diagnosis keyset is used.
 var ErrNilDiagKeys = errors.New("diagnosis key array cannot be empty")
 
