@@ -7,23 +7,31 @@ import (
 	"io"
 )
 
-// MaxUploadBatchSize is the maximum amount of diagnosis keys to be
-// uploaded per request.
-const MaxUploadBatchSize = 14
+const (
+	// MaxUploadBatchSize is the maximum amount of diagnosis keys to be
+	// uploaded per request.
+	MaxUploadBatchSize = 14
+
+	// DiagnosisKeySize is the size of a `Diagnosis Key`, consisting of a
+	// `Temporary Exposure Key` (16 bytes) and a `Day Number` (2 bytes).
+	// @see diag.DiagnosisKey.
+	DiagnosisKeySize = 18
+
+	// UploadLimit is the size limit for uploading diagnosis keys in bytes.
+	UploadLimit = MaxUploadBatchSize * DiagnosisKeySize
+)
 
 var (
 	// ErrNilDiagKeys is used when an empty diagnosis keyset is used.
 	ErrNilDiagKeys = errors.New("diag: diagnosis key array cannot be empty")
+
 	// ErrMaxUploadExceeded is used when upload batch size exceeds the limit.
 	ErrMaxUploadExceeded = errors.New("diag: maximum upload batch size exceeded")
 )
 
-// DiagnosisKey represents a `Daily Tracing Key` uploaded when the device owner
-// is diagnosed positive.
-//
-// A diagnosis key takes up 18 bytes of data: 16 bytes for the key, 2 bytes for
-// the day number.
-//
+// DiagnosisKey is the combination of a `Temporary Exposure Key` and its related
+// `Day Number`. A DiagnosisKey takes up 18 bytes of data: 16 bytes for the key,
+// 2 bytes for the day number.
 // @see https://covid19-static.cdn-apple.com/applications/covid19/current/static/contact-tracing/pdf/ContactTracing-BluetoothSpecificationv1.1.pdf
 type DiagnosisKey struct {
 	Key       [16]byte
@@ -59,28 +67,30 @@ func (s Service) FindAllDiagnosisKeys(ctx context.Context) ([]DiagnosisKey, erro
 
 // ParseDiagnosisKeys reads and parses diagnosis keys from an io.Reader.
 func (s Service) ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
-	diagKeys := make([]DiagnosisKey, 0, MaxUploadBatchSize)
+	buf := make([]byte, UploadLimit+1)
+	n, err := r.Read(buf)
 
-	for {
-		// 18 bytes for the key (16 bytes) and the day number (2 bytes).
-		var buf [18]byte
-		_, err := io.ReadFull(r, buf[:])
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
+	switch {
+	case err != nil && err != io.EOF:
+		return nil, err
+	case n == 0:
+		return nil, io.ErrUnexpectedEOF
+	case n == UploadLimit+1:
+		return nil, ErrMaxUploadExceeded
+	case n%DiagnosisKeySize != 0:
+		return nil, io.ErrUnexpectedEOF
+	}
 
-		if len(diagKeys) == MaxUploadBatchSize {
-			return nil, ErrMaxUploadExceeded
-		}
+	keyCount := n / DiagnosisKeySize
+	diagKeys := make([]DiagnosisKey, keyCount)
 
+	for i := 0; i < keyCount; i++ {
+		start := i * DiagnosisKeySize
 		var key [16]byte
-		copy(key[:], buf[:16])
-		dayNumber := binary.BigEndian.Uint16(buf[16:])
+		copy(key[:], buf[start:start+16])
+		dayNumber := binary.BigEndian.Uint16(buf[start+16 : start+DiagnosisKeySize])
 
-		diagKeys = append(diagKeys, DiagnosisKey{Key: key, DayNumber: dayNumber})
+		diagKeys[i] = DiagnosisKey{Key: key, DayNumber: dayNumber}
 	}
 
 	return diagKeys, nil

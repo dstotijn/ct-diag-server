@@ -18,4 +18,4 @@ docker run --rm --name $NAME -d -p $PORT:5432 \
   -v $PWD/postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql \
   postgres:11.7-alpine
 
-go test ./... -count=1
+go test ./... -v -count=1

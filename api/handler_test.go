@@ -181,7 +181,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expBody := "Request body is missing"
+		expBody := "Invalid body: unexpected EOF"
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
@@ -223,13 +223,6 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			DayNumber: uint16(42),
 		}
 
-		repo := testRepository{
-			storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
-				return errors.New("foobar")
-			},
-		}
-		handler := NewHandler(repo)
-
 		buf := &bytes.Buffer{}
 		for i := 0; i < diag.MaxUploadBatchSize+1; i++ {
 			_, err := buf.Write(diagKey.Key[:])
@@ -241,6 +234,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 				panic(err)
 			}
 		}
+		handler := NewHandler(nil)
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", buf)
 		w := httptest.NewRecorder()
 
