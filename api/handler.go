@@ -27,7 +27,7 @@ func NewHandler(repo diag.Repository) http.Handler {
 	return mux
 }
 
-// diagnosisKeys handles both GET and POST requests
+// diagnosisKeys handles both GET and POST requests.
 func (h *handler) diagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -82,8 +82,9 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	diagKeys := make([]diag.DiagnosisKey, 0, diag.MaxUploadBatchSize)
 
 	for {
-		var key [16]byte
-		_, err := io.ReadFull(r.Body, key[:])
+		// 18 bytes for the key (16 bytes) and the day number (2 bytes).
+		var diagKey [18]byte
+		_, err := io.ReadFull(r.Body, diagKey[:])
 		if err == io.EOF {
 			break
 		}
@@ -98,13 +99,9 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		dayNumBuf := make([]byte, 2)
-		_, err = io.ReadFull(r.Body, dayNumBuf)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Invalid day number: %v", err), http.StatusBadRequest)
-			return
-		}
-		dayNumber := binary.BigEndian.Uint16(dayNumBuf)
+		var key [16]byte
+		copy(key[:], diagKey[:16])
+		dayNumber := binary.BigEndian.Uint16(diagKey[16:])
 
 		diagKeys = append(diagKeys, diag.DiagnosisKey{Key: key, DayNumber: dayNumber})
 	}

@@ -1,10 +1,16 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
 NAME="pg-ct-diag-test"
 PORT="54321"
 
 export POSTGRES_DSN="postgres://$NAME:$NAME@127.0.0.1:$PORT/$NAME?sslmode=disable"
+
+function clean {
+  docker rm -f $NAME 
+}
+
+trap clean EXIT
 
 docker run --rm --name $NAME -d -p $PORT:5432 \
   -e POSTGRES_USER=$NAME \
@@ -13,5 +19,3 @@ docker run --rm --name $NAME -d -p $PORT:5432 \
   postgres:11.7-alpine
 
 go test ./... -count=1
-
-docker rm -f $NAME 

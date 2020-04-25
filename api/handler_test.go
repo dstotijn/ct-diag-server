@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -208,65 +207,6 @@ func TestPostDiagnosisKeys(t *testing.T) {
 		}
 
 		expBody := "Invalid diagnosis key: unexpected EOF"
-		resBody, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if got := strings.TrimSpace(string(resBody)); got != expBody {
-			t.Errorf("expected: %v, got: `%s`", expBody, got)
-		}
-	})
-
-	t.Run("missing day number", func(t *testing.T) {
-		handler := NewHandler(nil)
-		key, err := hex.DecodeString("8A79100D60F943C48C01FC96A156EE50")
-		if err != nil {
-			panic(err)
-		}
-
-		body := bytes.NewReader(key)
-		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", body)
-		w := httptest.NewRecorder()
-
-		handler.ServeHTTP(w, req)
-		resp := w.Result()
-
-		expStatusCode := 400
-		if got := resp.StatusCode; got != expStatusCode {
-			t.Errorf("expected: %v, got: %v", expStatusCode, got)
-		}
-
-		expBody := "Invalid day number: EOF"
-		resBody, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if got := strings.TrimSpace(string(resBody)); got != expBody {
-			t.Errorf("expected: %v, got: `%s`", expBody, got)
-		}
-	})
-
-	t.Run("invalid day number", func(t *testing.T) {
-		handler := NewHandler(nil)
-
-		body := bytes.NewBuffer([]byte{
-			1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, // Key
-			4, // Missing byte for day number
-		})
-		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", body)
-		w := httptest.NewRecorder()
-
-		handler.ServeHTTP(w, req)
-		resp := w.Result()
-
-		expStatusCode := 400
-		if got := resp.StatusCode; got != expStatusCode {
-			t.Errorf("expected: %v, got: %v", expStatusCode, got)
-		}
-
-		expBody := "Invalid day number: unexpected EOF"
 		resBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
