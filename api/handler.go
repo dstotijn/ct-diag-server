@@ -83,8 +83,8 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		// 18 bytes for the key (16 bytes) and the day number (2 bytes).
-		var diagKey [18]byte
-		_, err := io.ReadFull(r.Body, diagKey[:])
+		var buf [18]byte
+		_, err := io.ReadFull(r.Body, buf[:])
 		if err == io.EOF {
 			break
 		}
@@ -100,8 +100,8 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var key [16]byte
-		copy(key[:], diagKey[:16])
-		dayNumber := binary.BigEndian.Uint16(diagKey[16:])
+		copy(key[:], buf[:16])
+		dayNumber := binary.BigEndian.Uint16(buf[16:])
 
 		diagKeys = append(diagKeys, diag.DiagnosisKey{Key: key, DayNumber: dayNumber})
 	}
