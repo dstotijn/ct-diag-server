@@ -89,11 +89,6 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(diagKeys) == 0 {
-		http.Error(w, "Request body is missing", http.StatusBadRequest)
-		return
-	}
-
 	err = h.diagSvc.StoreDiagnosisKeys(r.Context(), diagKeys)
 	if err != nil {
 		log.Printf("api: error storing diagnosis keys: %v", err)

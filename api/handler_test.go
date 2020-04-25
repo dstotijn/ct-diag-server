@@ -348,3 +348,17 @@ func TestPostDiagnosisKeys(t *testing.T) {
 		})
 	})
 }
+
+func TestUnsupportedMethod(t *testing.T) {
+	handler := NewHandler(nil)
+	req := httptest.NewRequest("PATCH", "http://example.com/diagnosis-keys", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+	resp := w.Result()
+
+	expStatusCode := 405
+	if got := resp.StatusCode; got != expStatusCode {
+		t.Errorf("expected: %v, got: %v", expStatusCode, got)
+	}
+}
