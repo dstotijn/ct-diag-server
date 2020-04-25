@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -79,31 +78,15 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.
 func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
-	diagKeys := make([]diag.DiagnosisKey, 0, diag.MaxUploadBatchSize)
-
-	for {
-		// 18 bytes for the key (16 bytes) and the day number (2 bytes).
-		var buf [18]byte
-		_, err := io.ReadFull(r.Body, buf[:])
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Invalid diagnosis key: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		if len(diagKeys) == diag.MaxUploadBatchSize {
-			code := http.StatusRequestEntityTooLarge
-			http.Error(w, http.StatusText(code), code)
-			return
-		}
-
-		var key [16]byte
-		copy(key[:], buf[:16])
-		dayNumber := binary.BigEndian.Uint16(buf[16:])
-
-		diagKeys = append(diagKeys, diag.DiagnosisKey{Key: key, DayNumber: dayNumber})
+	diagKeys, err := h.diagSvc.ParseDiagnosisKeys(r.Body)
+	if err == diag.ErrMaxUploadExceeded {
+		code := http.StatusRequestEntityTooLarge
+		http.Error(w, http.StatusText(code), code)
+		return
+	}
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid body: %v", err), http.StatusBadRequest)
+		return
 	}
 
 	if len(diagKeys) == 0 {
@@ -111,7 +94,7 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.diagSvc.StoreDiagnosisKeys(r.Context(), diagKeys)
+	err = h.diagSvc.StoreDiagnosisKeys(r.Context(), diagKeys)
 	if err != nil {
 		log.Printf("api: error storing diagnosis keys: %v", err)
 		writeInternalErrorResp(w, err)

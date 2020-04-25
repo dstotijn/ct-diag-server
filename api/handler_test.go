@@ -206,7 +206,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expBody := "Invalid diagnosis key: unexpected EOF"
+		expBody := "Invalid body: unexpected EOF"
 		resBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
