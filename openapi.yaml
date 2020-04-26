@@ -37,9 +37,8 @@ paths:
         To be used for fetching a list of Diagnosis Keys. A typical client is either a mobile device, or an intermediate platform/server of an app developer, for manual/custom distribution of the payload to clients. In either case, the keyset can be regarded as public; it doesn't contain PII.
 
         The HTTP response body is a bytestream of Diagnosis Keys. A diagnosis key consists
-        of two parts: the key data itself (16 bytes), and 2 bytes (big endian) to denote
-        the _Day Number_; the day since Unix Epoch (see [this note](https://github.com/dstotijn/ct-diag-server/diag/diag.go#L22) on
-        why 2 bytes was chosen and what the consequence is). Because the amount of bytes
+        of two parts: the `TemporaryExposureKey` (16 bytes), and 2 bytes (big endian) to denote
+        its `ENIntervalNumber`; the 10 minute interval since Unix Epoch. Because the amount of bytes
         per diagnosis key is fixed, there is no delimiter.
       responses:
         "200":
@@ -47,13 +46,13 @@ paths:
           headers:
             Content-Length:
               description:
-                Is `n * 18`, where `n` is the amount of found Diagnosis
-                Keys.
+                Is `n * 20`, where `n` is the amount of found Diagnosis
+                Keys. E.g. "840" for 42 keys.
               style: simple
               explode: false
               schema:
                 type: integer
-                example: 18000
+                example: 840
           content:
             application/octet-stream:
               schema:
@@ -73,7 +72,7 @@ paths:
         **Note:** There currently is no authentication, nor is there a means to obtain
         and compute a bearer token. See [TODO](https://github.com/dstotijn/ct-diag-server#todo).
 
-        The HTTP request body should be a bytestream of `1 <= 14` Diagnosis Keys. A diagnosis key consists of two parts: the key data itself (16 bytes), and 2 bytes (big endian) to denote the _Day Number_ (see above). Because the amount of bytes per diagnosis key is fixed, there is no delimiter.
+        The HTTP request body should be a bytestream of `1 <= 14` Diagnosis Keys. A diagnosis key consists of two parts: the `TemporaryExposureKey` (16 bytes), and 2 bytes (big endian) to denote its `ENIntervalNumber`. Because the amount of bytes per diagnosis key is fixed, there is no delimiter.
       requestBody:
         content:
           application/octet-stream:
@@ -94,7 +93,7 @@ paths:
             text/plain; charset=utf-8:
               schema:
                 type: string
-                example: "Invalid day number: unexpected EOF"
+                example: "Invalid body: unexpected EOF"
         "500":
           description: Unexpected error
           content:

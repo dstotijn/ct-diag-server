@@ -55,21 +55,20 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	// 18 bytes per diagnosis key: 16 bytes (key) + 2 bytes (day number).
-	w.Header().Set("Content-Length", strconv.Itoa(len(diagKeys)*18))
+	w.Header().Set("Content-Length", strconv.Itoa(len(diagKeys)*diag.DiagnosisKeySize))
 
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
-	// written with the diagnosis key itself, and 2 bytes for its day
-	// number (uint16, big endian). Because both parts have a fixed length,
-	// there is no delimiter.
+	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
+	// (uint32, big endian). Because both parts have a fixed length, there is no
+	// delimiter.
 	for i := range diagKeys {
-		_, err := w.Write(diagKeys[i].Key[:])
+		_, err := w.Write(diagKeys[i].TemporaryExposureKey[:])
 		if err != nil {
 			return
 		}
-		dayNumber := make([]byte, 2)
-		binary.BigEndian.PutUint16(dayNumber, diagKeys[i].DayNumber)
-		_, err = w.Write(dayNumber)
+		enin := make([]byte, 4)
+		binary.BigEndian.PutUint32(enin, diagKeys[i].ENIntervalNumber)
+		_, err = w.Write(enin)
 		if err != nil {
 			return
 		}

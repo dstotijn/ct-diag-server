@@ -50,7 +50,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, day_number) VALUES ($1, $2)
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, interval_number) VALUES ($1, $2)
 	ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING`)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	defer stmt.Close()
 
 	for _, diagKey := range diagKeys {
-		_, err = stmt.ExecContext(ctx, diagKey.Key[:], diagKey.DayNumber)
+		_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber)
 		if err != nil {
 			return fmt.Errorf("postgres: could not execute statement: %v", err)
 		}
@@ -76,7 +76,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
 	var diagKeys []diag.DiagnosisKey
 
-	rows, err := c.db.QueryContext(ctx, "SELECT key, day_number FROM diagnosis_keys")
+	rows, err := c.db.QueryContext(ctx, "SELECT key, interval_number FROM diagnosis_keys")
 	if err != nil {
 		return nil, fmt.Errorf("postgres: could not execute query: %v", err)
 	}
@@ -85,11 +85,11 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	for rows.Next() {
 		var diagKey diag.DiagnosisKey
 		key := make([]byte, 16)
-		err := rows.Scan(&key, &diagKey.DayNumber)
+		err := rows.Scan(&key, &diagKey.ENIntervalNumber)
 		if err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}
-		copy(diagKey.Key[:], key)
+		copy(diagKey.TemporaryExposureKey[:], key)
 		diagKeys = append(diagKeys, diagKey)
 	}
 	rows.Close()

@@ -7,7 +7,6 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -80,11 +79,11 @@ func postDiagnosisKeys(baseURL string, batchSize int) {
 
 	buf := &bytes.Buffer{}
 	for _, diagKey := range diagKeys {
-		_, err := buf.Write(diagKey.Key[:])
+		_, err := buf.Write(diagKey.TemporaryExposureKey[:])
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = binary.Write(buf, binary.BigEndian, diagKey.DayNumber)
+		err = binary.Write(buf, binary.BigEndian, diagKey.ENIntervalNumber)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -116,10 +115,7 @@ func postDiagnosisKeys(baseURL string, batchSize int) {
 
 func diagnosisKeys(n int) (keys []diag.DiagnosisKey) {
 	for i := 0; i < n; i++ {
-		dayNumber := dayNumber(time.Now().AddDate(0, 0, -(i + 1)))
-		if dayNumber > math.MaxUint16 {
-			log.Fatal("Oh no, this must mean it's Jun 7, 2149 or later...")
-		}
+		enin := time.Now().AddDate(0, 0, -(i+1)).Unix() / (60 * 10)
 		buf := make([]byte, 16)
 		_, err := rand.Read(buf)
 		if err != nil {
@@ -128,13 +124,9 @@ func diagnosisKeys(n int) (keys []diag.DiagnosisKey) {
 		var key [16]byte
 		copy(key[:], buf)
 		keys = append(keys, diag.DiagnosisKey{
-			Key:       key,
-			DayNumber: uint16(dayNumber),
+			TemporaryExposureKey: key,
+			ENIntervalNumber:     uint32(enin),
 		})
 	}
 	return
-}
-
-func dayNumber(t time.Time) int64 {
-	return t.Unix() / (60 * 60 * 24)
 }

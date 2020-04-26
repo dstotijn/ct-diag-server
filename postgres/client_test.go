@@ -55,14 +55,14 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			name: "valid diagnosis keyset",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					Key:       key,
-					DayNumber: uint16(42),
+					TemporaryExposureKey: key,
+					ENIntervalNumber:     uint32(42),
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					Key:       key,
-					DayNumber: uint16(42),
+					TemporaryExposureKey: key,
+					ENIntervalNumber:     uint32(42),
 				},
 			},
 			expError: nil,
@@ -71,18 +71,18 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			name: "duplicate diagnosis keyset",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					Key:       key,
-					DayNumber: uint16(42),
+					TemporaryExposureKey: key,
+					ENIntervalNumber:     uint32(42),
 				},
 				{
-					Key:       key,
-					DayNumber: uint16(42),
+					TemporaryExposureKey: key,
+					ENIntervalNumber:     uint32(42),
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					Key:       key,
-					DayNumber: uint16(42),
+					TemporaryExposureKey: key,
+					ENIntervalNumber:     uint32(42),
 				},
 			},
 			expError: nil,
@@ -103,7 +103,7 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 
 			var diagKeys []diag.DiagnosisKey
 
-			rows, err := client.db.QueryContext(ctx, "SELECT key, day_number FROM diagnosis_keys")
+			rows, err := client.db.QueryContext(ctx, "SELECT key, interval_number FROM diagnosis_keys")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -112,11 +112,11 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			for rows.Next() {
 				var diagKey diag.DiagnosisKey
 				key := make([]byte, 16)
-				err := rows.Scan(&key, &diagKey.DayNumber)
+				err := rows.Scan(&key, &diagKey.ENIntervalNumber)
 				if err != nil {
 					t.Fatal(err)
 				}
-				copy(diagKey.Key[:], key)
+				copy(diagKey.TemporaryExposureKey[:], key)
 				diagKeys = append(diagKeys, diagKey)
 			}
 			rows.Close()
@@ -158,14 +158,14 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			name: "diagnosis keys in database",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					Key:       key,
-					DayNumber: uint16(42),
+					TemporaryExposureKey: key,
+					ENIntervalNumber:     uint32(42),
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					Key:       key,
-					DayNumber: uint16(42),
+					TemporaryExposureKey: key,
+					ENIntervalNumber:     uint32(42),
 				},
 			},
 			expError: nil,
@@ -180,14 +180,14 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, day_number) VALUES ($1, $2)")
+			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, interval_number) VALUES ($1, $2)")
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer stmt.Close()
 
 			for _, diagKey := range tt.diagKeys {
-				_, err = stmt.ExecContext(ctx, diagKey.Key[:], diagKey.DayNumber)
+				_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber)
 				if err != nil {
 					t.Fatal(err)
 				}

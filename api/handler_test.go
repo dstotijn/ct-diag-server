@@ -81,8 +81,8 @@ func TestListDiagnosisKeys(t *testing.T) {
 	t.Run("diagnosis keys found", func(t *testing.T) {
 		expDiagKeys := []diag.DiagnosisKey{
 			{
-				Key:       [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-				DayNumber: uint16(42),
+				TemporaryExposureKey: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+				ENIntervalNumber:     uint32(42),
 			},
 		}
 		repo := testRepository{
@@ -103,7 +103,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expContentLength := strconv.Itoa(len(expDiagKeys) * 18)
+		expContentLength := strconv.Itoa(len(expDiagKeys) * 20)
 		if got := resp.Header.Get("Content-Length"); got != expContentLength {
 			t.Fatalf("expected: %v, got: %v", expContentLength, got)
 		}
@@ -120,8 +120,8 @@ func TestListDiagnosisKeys(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var dayNumber uint16
-			err = binary.Read(resp.Body, binary.BigEndian, &dayNumber)
+			var enin uint32
+			err = binary.Read(resp.Body, binary.BigEndian, &enin)
 			if err == io.EOF {
 				t.Fatal(err)
 			}
@@ -129,7 +129,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			got = append(got, diag.DiagnosisKey{Key: key, DayNumber: dayNumber})
+			got = append(got, diag.DiagnosisKey{TemporaryExposureKey: key, ENIntervalNumber: enin})
 		}
 
 		if !reflect.DeepEqual(got, expDiagKeys) {
@@ -219,17 +219,17 @@ func TestPostDiagnosisKeys(t *testing.T) {
 
 	t.Run("too many diagnosis keys", func(t *testing.T) {
 		diagKey := diag.DiagnosisKey{
-			Key:       [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-			DayNumber: uint16(42),
+			TemporaryExposureKey: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+			ENIntervalNumber:     uint32(42),
 		}
 
 		buf := &bytes.Buffer{}
 		for i := 0; i < diag.MaxUploadBatchSize+1; i++ {
-			_, err := buf.Write(diagKey.Key[:])
+			_, err := buf.Write(diagKey.TemporaryExposureKey[:])
 			if err != nil {
 				panic(err)
 			}
-			err = binary.Write(buf, binary.BigEndian, diagKey.DayNumber)
+			err = binary.Write(buf, binary.BigEndian, diagKey.ENIntervalNumber)
 			if err != nil {
 				panic(err)
 			}
@@ -260,19 +260,19 @@ func TestPostDiagnosisKeys(t *testing.T) {
 	t.Run("valid diagnosis key", func(t *testing.T) {
 		expDiagKeys := []diag.DiagnosisKey{
 			{
-				Key:       [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-				DayNumber: uint16(42),
+				TemporaryExposureKey: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+				ENIntervalNumber:     uint32(42),
 			},
 		}
 
 		validBody := func() *bytes.Buffer {
 			buf := &bytes.Buffer{}
 			for _, expDiagKey := range expDiagKeys {
-				_, err := buf.Write(expDiagKey.Key[:])
+				_, err := buf.Write(expDiagKey.TemporaryExposureKey[:])
 				if err != nil {
 					panic(err)
 				}
-				err = binary.Write(buf, binary.BigEndian, expDiagKey.DayNumber)
+				err = binary.Write(buf, binary.BigEndian, expDiagKey.ENIntervalNumber)
 				if err != nil {
 					panic(err)
 				}
