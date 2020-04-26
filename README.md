@@ -32,6 +32,8 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
 - [API reference](#api-reference)
 - [TODO](#todo)
 - [Status](#status)
+- [Contributors](#contributors)
+- [Acknowledgements](#acknowledgements)
 - [License](#license)
 
 ## Goals
@@ -145,13 +147,19 @@ in a `text/plain; charset=utf-8` response body.
 
 The project is currently under active development.
 
-## License
-
-[MIT](LICENSE)
-
 ## Contributors
 
 David Stotijn, Martin van de Belt, Milo van der Linden, Peter Hellberg.
+
+## Acknowledgements
+
+Thanks to the community of [Code for NL](https://www.codefor.nl/) (`#corona-apps`
+and `#corona-ct-diag-server` on [Slack](https://praatmee.codefor.nl)) for all the
+valuable feedback and discussions!
+
+## License
+
+[MIT](LICENSE)
 
 ---
 
