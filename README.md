@@ -143,6 +143,8 @@ in a `text/plain; charset=utf-8` response body.
 - [ ] Write benchmarks.
 - [ ] Add FAQ and/or guide for server operators.
 
+👉 See [issue tracker](https://github.com/dstotijn/ct-diag-server/issues).
+
 ## Status
 
 The project is currently under active development.
