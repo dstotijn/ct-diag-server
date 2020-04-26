@@ -135,7 +135,7 @@ in a `text/plain; charset=utf-8` response body.
 
 ## TODO
 
-- [ ] Add lache interface and (in-memory/file system) implementations.
+- [ ] Add cache interface and (in-memory/file system) implementations.
 - [ ] Add `ETag` response header to assist client side caching.
 - [ ] Add script (optionally worker) to delete keys > 14 days.
 - [ ] Add `since` query parameter to `listDiagnosisKeys` endpoint to allow
