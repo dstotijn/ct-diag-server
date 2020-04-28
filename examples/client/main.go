@@ -115,7 +115,9 @@ func postDiagnosisKeys(baseURL string, batchSize int) {
 
 func diagnosisKeys(n int) (keys []diag.DiagnosisKey) {
 	for i := 0; i < n; i++ {
-		enin := time.Now().AddDate(0, 0, -(i+1)).Unix() / (60 * 10)
+		// startRollingNumber is the ENIntervalNumber that denotes the start
+		// validity time of a TemporaryExposureKey.
+		startRollingNumber := time.Now().AddDate(0, 0, -(i+1)).Unix() / (60 * 10) / 144 * 144
 		buf := make([]byte, 16)
 		_, err := rand.Read(buf)
 		if err != nil {
@@ -125,7 +127,7 @@ func diagnosisKeys(n int) (keys []diag.DiagnosisKey) {
 		copy(key[:], buf)
 		keys = append(keys, diag.DiagnosisKey{
 			TemporaryExposureKey: key,
-			ENIntervalNumber:     uint32(enin),
+			ENIntervalNumber:     uint32(startRollingNumber),
 		})
 	}
 	return
