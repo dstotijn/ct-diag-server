@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/dstotijn/ct-diag-server/diag"
 
@@ -50,7 +51,9 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, interval_number) VALUES ($1, $2)
+	createdAt := time.Now()
+
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)
 	ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING`)
 	if err != nil {
 		return err
@@ -58,7 +61,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	defer stmt.Close()
 
 	for _, diagKey := range diagKeys {
-		_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber)
+		_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber, createdAt)
 		if err != nil {
 			return fmt.Errorf("postgres: could not execute statement: %v", err)
 		}

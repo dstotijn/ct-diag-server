@@ -180,14 +180,16 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, interval_number) VALUES ($1, $2)")
+			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)")
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer stmt.Close()
 
+			createdAt := time.Now()
+
 			for _, diagKey := range tt.diagKeys {
-				_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber)
+				_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber, createdAt)
 				if err != nil {
 					t.Fatal(err)
 				}
