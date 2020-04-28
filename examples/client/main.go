@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -59,18 +58,17 @@ func listDiagnosisKeys(baseURL string) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	svc := diag.NewService(nil)
+	diagKeys, err := svc.ParseDiagnosisKeys(resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	contentLength, _ := strconv.Atoi(resp.Header.Get("Content-Length"))
-
-	log.Printf("Received HTTP response with %v key(s): %v %v: [% #x]",
-		contentLength/diag.DiagnosisKeySize,
+	log.Printf("Received HTTP response with %v key(s): %v %v: %+v",
+		len(diagKeys),
 		resp.StatusCode,
 		http.StatusText(resp.StatusCode),
-		body,
+		diagKeys,
 	)
 }
 
