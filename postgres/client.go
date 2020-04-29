@@ -56,7 +56,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)
 	ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING`)
 	if err != nil {
-		return err
+		return fmt.Errorf("postgres: could not prepare statement: %v", err)
 	}
 	defer stmt.Close()
 
@@ -67,8 +67,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 		}
 	}
 
-	err = tx.Commit()
-	if err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("postgres: cannot commit transaction: %v", err)
 	}
 
@@ -88,8 +87,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	for rows.Next() {
 		var diagKey diag.DiagnosisKey
 		key := make([]byte, 16)
-		err := rows.Scan(&key, &diagKey.ENIntervalNumber)
-		if err != nil {
+		if err := rows.Scan(&key, &diagKey.ENIntervalNumber); err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}
 		copy(diagKey.TemporaryExposureKey[:], key)
@@ -97,8 +95,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	}
 	rows.Close()
 
-	err = rows.Err()
-	if err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("postgres: could not iterate over rows: %v", err)
 	}
 
