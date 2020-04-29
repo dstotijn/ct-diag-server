@@ -58,8 +58,7 @@ func listDiagnosisKeys(baseURL string) {
 	}
 	defer resp.Body.Close()
 
-	svc := diag.NewService(nil)
-	diagKeys, err := svc.ParseDiagnosisKeys(resp.Body)
+	diagKeys, err := diag.ParseDiagnosisKeys(resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
