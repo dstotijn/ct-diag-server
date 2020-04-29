@@ -136,7 +136,7 @@ in a `text/plain; charset=utf-8` response body.
 ## TODO
 
 - [ ] Add cache interface and (in-memory/file system) implementations.
-- [ ] Add `ETag` response header to assist client side caching.
+- [ ] Support byte ranges for listing Diagnosis Keys.
 - [ ] Add script (optionally worker) to delete keys > 14 days.
 - [ ] Add `since` query parameter to `listDiagnosisKeys` endpoint to allow
       offsetting the Diagnosis Key list by `ENIntervalNumber` to minimize data sent over the wire.
