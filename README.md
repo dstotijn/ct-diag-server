@@ -151,7 +151,7 @@ The project is currently under active development.
 
 ## Contributors
 
-David Stotijn, Martin van de Belt, Milo van der Linden, Peter Hellberg.
+David Stotijn, Martin van de Belt, Milo van der Linden, Peter Hellberg, Arian van Putten.
 
 ## Acknowledgements
 
