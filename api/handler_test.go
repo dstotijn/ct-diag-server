@@ -241,12 +241,12 @@ func TestPostDiagnosisKeys(t *testing.T) {
 		handler.ServeHTTP(w, req)
 		resp := w.Result()
 
-		expStatusCode := 413
+		expStatusCode := 400
 		if got := resp.StatusCode; got != expStatusCode {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expBody := "Request Entity Too Large"
+		expBody := "Invalid body: http: request body too large"
 		resBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)

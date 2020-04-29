@@ -77,12 +77,8 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.
 func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
-	diagKeys, err := h.diagSvc.ParseDiagnosisKeys(r.Body)
-	if err == diag.ErrMaxUploadExceeded {
-		code := http.StatusRequestEntityTooLarge
-		http.Error(w, http.StatusText(code), code)
-		return
-	}
+	maxBytesReader := http.MaxBytesReader(w, r.Body, diag.UploadLimit)
+	diagKeys, err := h.diagSvc.ParseDiagnosisKeys(maxBytesReader)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid body: %v", err), http.StatusBadRequest)
 		return

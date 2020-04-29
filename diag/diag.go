@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"io/ioutil"
 )
 
 const (
@@ -67,15 +68,15 @@ func (s Service) FindAllDiagnosisKeys(ctx context.Context) ([]DiagnosisKey, erro
 
 // ParseDiagnosisKeys reads and parses diagnosis keys from an io.Reader.
 func (s Service) ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
-	buf := make([]byte, UploadLimit+1)
-	n, err := r.Read(buf)
+	buf, err := ioutil.ReadAll(r)
+	n := len(buf)
 
 	switch {
 	case err != nil && err != io.EOF:
 		return nil, err
 	case n == 0:
 		return nil, io.ErrUnexpectedEOF
-	case n == UploadLimit+1:
+	case n > UploadLimit:
 		return nil, ErrMaxUploadExceeded
 	case n%DiagnosisKeySize != 0:
 		return nil, io.ErrUnexpectedEOF
