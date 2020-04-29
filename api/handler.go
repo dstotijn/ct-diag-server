@@ -54,8 +54,8 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-
 	w.Header().Set("Content-Length", strconv.Itoa(len(diagKeys)*diag.DiagnosisKeySize))
+	w.Header().Set("Cache-Control", "public, max-age=0, s-maxage=600")
 
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
 	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
