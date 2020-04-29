@@ -18,7 +18,7 @@ repository for submitting Diagnosis Keys after a positive test, and retrieving a
 collection of all previously submitted Diagnosis Keys, to be used on the device
 for offline key matching.
 
-ℹ️ The terminology and usage corresponds with v1.1 of the specification, as found
+ℹ️ The terminology and usage corresponds with v1.2 of the specification, as found
 [here](https://www.apple.com/covid19/contacttracing/) and [here](https://www.blog.google/inside-google/company-announcements/apple-and-google-partner-covid-19-contact-tracing-technology/).
 
 👉 Are you an app developer or working for a government and/or health care organization
