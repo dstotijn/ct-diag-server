@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/binary"
 	"fmt"
 	"log"
 	"net/http"
@@ -57,28 +56,13 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(diagKeys)*diag.DiagnosisKeySize))
 	w.Header().Set("Cache-Control", "public, max-age=0, s-maxage=600")
 
-	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
-	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
-	// (uint32, big endian). Because both parts have a fixed length, there is no
-	// delimiter.
-	for i := range diagKeys {
-		_, err := w.Write(diagKeys[i].TemporaryExposureKey[:])
-		if err != nil {
-			return
-		}
-		enin := make([]byte, 4)
-		binary.BigEndian.PutUint32(enin, diagKeys[i].ENIntervalNumber)
-		_, err = w.Write(enin)
-		if err != nil {
-			return
-		}
-	}
+	_ = diag.WriteDiagnosisKeys(w, diagKeys)
 }
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.
 func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	maxBytesReader := http.MaxBytesReader(w, r.Body, diag.UploadLimit)
-	diagKeys, err := h.diagSvc.ParseDiagnosisKeys(maxBytesReader)
+	diagKeys, err := diag.ParseDiagnosisKeys(maxBytesReader)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid body: %v", err), http.StatusBadRequest)
 		return

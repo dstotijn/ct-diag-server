@@ -67,7 +67,7 @@ func (s Service) FindAllDiagnosisKeys(ctx context.Context) ([]DiagnosisKey, erro
 }
 
 // ParseDiagnosisKeys reads and parses diagnosis keys from an io.Reader.
-func (s Service) ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
+func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 	buf, err := ioutil.ReadAll(r)
 	n := len(buf)
 
@@ -95,4 +95,26 @@ func (s Service) ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 	}
 
 	return diagKeys, nil
+}
+
+// WriteDiagnosisKeys writes a stream of Diagnosis Keys to an io.Writer.
+func WriteDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
+	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
+	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
+	// (uint32, big endian). Because both parts have a fixed length, there is no
+	// delimiter.
+	for i := range diagKeys {
+		_, err := w.Write(diagKeys[i].TemporaryExposureKey[:])
+		if err != nil {
+			return err
+		}
+		enin := make([]byte, 4)
+		binary.BigEndian.PutUint32(enin, diagKeys[i].ENIntervalNumber)
+		_, err = w.Write(enin)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
