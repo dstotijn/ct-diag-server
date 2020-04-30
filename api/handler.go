@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,15 +16,20 @@ type handler struct {
 }
 
 // NewHandler returns a new Handler.
-func NewHandler(repo diag.Repository) http.Handler {
-	h := handler{diagSvc: diag.NewService(repo)}
+func NewHandler(ctx context.Context, repo diag.Repository, cache diag.Cache) (http.Handler, error) {
+	diagSvc, err := diag.NewService(ctx, repo, cache)
+	if err != nil {
+		return nil, err
+	}
+
+	h := handler{diagSvc: diagSvc}
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/diagnosis-keys", h.diagnosisKeys)
 	mux.HandleFunc("/health", h.health)
 
-	return mux
+	return mux, nil
 }
 
 // diagnosisKeys handles both GET and POST requests.
@@ -39,24 +46,18 @@ func (h *handler) diagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 // listDiagnosisKeys writes all diagnosis keys as binary data in the HTTP response.
 func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
-	diagKeys, err := h.diagSvc.FindAllDiagnosisKeys(r.Context())
-	if err != nil {
-		log.Printf("api: error finding all diagnosis keys: %v", err)
-		writeInternalErrorResp(w, err)
-		return
-	}
-
-	if len(diagKeys) == 0 {
-		w.Header().Set("Content-Length", "0")
-		return
-	}
-
+	w.Header().Set("Cache-Control", "public, max-age=0, s-maxage=600")
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Content-Length", strconv.Itoa(len(diagKeys)*diag.DiagnosisKeySize))
-	w.Header().Set("Cache-Control", "public, max-age=0, s-maxage=600")
 
-	_ = diag.WriteDiagnosisKeys(w, diagKeys)
+	itemCount := h.diagSvc.ItemCount()
+	w.Header().Set("Content-Length", strconv.Itoa(itemCount*diag.DiagnosisKeySize))
+
+	bw := bufio.NewWriter(w)
+	if _, err := h.diagSvc.WriteDiagnosisKeys(bw); err != nil {
+		return
+	}
+	bw.Flush()
 }
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.

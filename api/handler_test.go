@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strconv"
@@ -29,8 +30,26 @@ func (ts testRepository) FindAllDiagnosisKeys(ctx context.Context) ([]diag.Diagn
 	return ts.findAllDiagnosisKeysFn(ctx)
 }
 
+var noopRepo = testRepository{
+	storeDiagnosisKeysFn:   func(_ context.Context, _ []diag.DiagnosisKey) error { return nil },
+	findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
+}
+
+func newTestHandler(t *testing.T, repo diag.Repository) http.Handler {
+	cache := &diag.MemoryCache{}
+	if repo == nil {
+		repo = noopRepo
+	}
+	handler, err := NewHandler(context.Background(), repo, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return handler
+}
+
 func TestHealth(t *testing.T) {
-	handler := NewHandler(nil)
+	handler := newTestHandler(t, nil)
+
 	req := httptest.NewRequest("GET", "http://example.com/health", nil)
 	w := httptest.NewRecorder()
 
@@ -60,7 +79,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 				return nil, nil
 			},
 		}
-		handler := NewHandler(repo)
+		handler := newTestHandler(t, repo)
 		req := httptest.NewRequest("GET", "http://example.com/diagnosis-keys", nil)
 		w := httptest.NewRecorder()
 
@@ -91,7 +110,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 			},
 		}
 
-		handler := NewHandler(repo)
+		handler := newTestHandler(t, repo)
 		req := httptest.NewRequest("GET", "http://example.com/diagnosis-keys", nil)
 		w := httptest.NewRecorder()
 
@@ -136,40 +155,11 @@ func TestListDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %#v, got: %#v", expDiagKeys, got)
 		}
 	})
-
-	t.Run("diag.Service returns error", func(t *testing.T) {
-		repo := testRepository{
-			findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
-				return nil, errors.New("foobar")
-			},
-		}
-		handler := NewHandler(repo)
-		req := httptest.NewRequest("GET", "http://example.com/diagnosis-keys", nil)
-		w := httptest.NewRecorder()
-
-		handler.ServeHTTP(w, req)
-		resp := w.Result()
-
-		expStatusCode := 500
-		if got := resp.StatusCode; got != expStatusCode {
-			t.Errorf("expected: %v, got: %v", expStatusCode, got)
-		}
-
-		expBody := "Internal Server Error"
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if got := strings.TrimSpace(string(body)); got != expBody {
-			t.Errorf("expected: %v, got: `%s`", expBody, got)
-		}
-	})
 }
 
 func TestPostDiagnosisKeys(t *testing.T) {
 	t.Run("missing post body", func(t *testing.T) {
-		handler := NewHandler(nil)
+		handler := newTestHandler(t, nil)
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", nil)
 		w := httptest.NewRecorder()
 
@@ -193,7 +183,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 	})
 
 	t.Run("incomplete diagnosis key", func(t *testing.T) {
-		handler := NewHandler(nil)
+		handler := newTestHandler(t, nil)
 		body := bytes.NewReader([]byte{0x00})
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", body)
 		w := httptest.NewRecorder()
@@ -234,7 +224,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 				panic(err)
 			}
 		}
-		handler := NewHandler(nil)
+		handler := newTestHandler(t, nil)
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", buf)
 		w := httptest.NewRecorder()
 
@@ -288,8 +278,9 @@ func TestPostDiagnosisKeys(t *testing.T) {
 					storedDiagKeys = diagKeys
 					return nil
 				},
+				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
 			}
-			handler := NewHandler(repo)
+			handler := newTestHandler(t, repo)
 
 			req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", validBody())
 			w := httptest.NewRecorder()
@@ -319,11 +310,12 @@ func TestPostDiagnosisKeys(t *testing.T) {
 
 		t.Run("diag.Service returns unexpected error", func(t *testing.T) {
 			repo := testRepository{
+				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
 				storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
 					return errors.New("foobar")
 				},
 			}
-			handler := NewHandler(repo)
+			handler := newTestHandler(t, repo)
 
 			req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", validBody())
 			w := httptest.NewRecorder()
@@ -350,7 +342,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 }
 
 func TestUnsupportedMethod(t *testing.T) {
-	handler := NewHandler(nil)
+	handler := newTestHandler(t, nil)
 	req := httptest.NewRequest("PATCH", "http://example.com/diagnosis-keys", nil)
 	w := httptest.NewRecorder()
 

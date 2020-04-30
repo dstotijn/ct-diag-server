@@ -1,9 +1,11 @@
 package diag
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 )
@@ -48,17 +50,44 @@ type Repository interface {
 
 // Service represents the service for managing diagnosis keys.
 type Service struct {
-	repo Repository
+	repo  Repository
+	cache Cache
 }
 
 // NewService returns a new Service.
-func NewService(repo Repository) Service {
-	return Service{repo: repo}
+func NewService(ctx context.Context, repo Repository, cache Cache) (Service, error) {
+	svc := Service{
+		repo:  repo,
+		cache: cache,
+	}
+
+	// Hydrate cache.
+	diagKeys, err := svc.repo.FindAllDiagnosisKeys(ctx)
+	if err != nil {
+		return Service{}, fmt.Errorf("diag: could not hydrate cache: %v", err)
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
+	writeDiagnosisKeys(buf, diagKeys)
+
+	svc.cache.Set(buf.Bytes())
+
+	return svc, nil
 }
 
 // StoreDiagnosisKeys persists a set of diagnosis keys to the repository.
 func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey) error {
-	return s.repo.StoreDiagnosisKeys(ctx, diagKeys)
+	if err := s.repo.StoreDiagnosisKeys(ctx, diagKeys); err != nil {
+		return err
+	}
+
+	go func() {
+		buf := bytes.NewBuffer(make([]byte, len(diagKeys)*DiagnosisKeySize))
+		writeDiagnosisKeys(buf, diagKeys)
+		s.cache.Add(buf.Bytes())
+	}()
+
+	return nil
 }
 
 // FindAllDiagnosisKeys fetches all diagnosis keys from the repository.
@@ -97,8 +126,17 @@ func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 	return diagKeys, nil
 }
 
+// ItemCount returns the amount of known diagnosis keys.
+func (s Service) ItemCount() int {
+	return s.cache.Size() / DiagnosisKeySize
+}
+
 // WriteDiagnosisKeys writes a stream of Diagnosis Keys to an io.Writer.
-func WriteDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
+func (s Service) WriteDiagnosisKeys(w io.Writer) (int64, error) {
+	return s.cache.WriteTo(w)
+}
+
+func writeDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
 	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
 	// (uint32, big endian). Because both parts have a fixed length, there is no
