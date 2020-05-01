@@ -59,6 +59,7 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
   wire: 20 bytes per _Diagnosis Key_ (16 bytes for the `TemporaryExposureKey`,
   4 bytes for the `ENIntervalNumber`).
 - PostgreSQL support for storage.
+- Caching interface, with in-memory implementation.
 
 ---
 
@@ -135,7 +136,6 @@ in a `text/plain; charset=utf-8` response body.
 
 ## TODO
 
-- [ ] Add cache interface and (in-memory/file system) implementations.
 - [ ] Support byte ranges for listing Diagnosis Keys.
 - [ ] Add script (optionally worker) to delete keys > 14 days.
 - [ ] Add `since` query parameter to `listDiagnosisKeys` endpoint to allow
