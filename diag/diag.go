@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
+	"time"
 )
 
 const (
@@ -62,15 +64,16 @@ func NewService(ctx context.Context, repo Repository, cache Cache) (Service, err
 	}
 
 	// Hydrate cache.
-	diagKeys, err := svc.repo.FindAllDiagnosisKeys(ctx)
-	if err != nil {
+	if err := svc.hydrateCache(ctx); err != nil {
 		return Service{}, fmt.Errorf("diag: could not hydrate cache: %v", err)
 	}
 
-	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
-	writeDiagnosisKeys(buf, diagKeys)
-
-	svc.cache.Set(buf.Bytes())
+	// Run cache refresh worker in separate goroutine.
+	go func() {
+		if err := svc.refreshCache(ctx); err != nil && err != context.Canceled {
+			log.Printf("Could not refresh cache: %v", err)
+		}
+	}()
 
 	return svc, nil
 }
@@ -132,8 +135,9 @@ func (s Service) ItemCount() int {
 }
 
 // WriteDiagnosisKeys writes a stream of Diagnosis Keys to an io.Writer.
-func (s Service) WriteDiagnosisKeys(w io.Writer) (int64, error) {
-	return s.cache.WriteTo(w)
+func (s Service) WriteDiagnosisKeys(w io.Writer) (int, error) {
+	buf := s.cache.Get()
+	return w.Write(buf)
 }
 
 func writeDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
@@ -155,4 +159,31 @@ func writeDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
 	}
 
 	return nil
+}
+
+func (s Service) hydrateCache(ctx context.Context) error {
+	diagKeys, err := s.repo.FindAllDiagnosisKeys(ctx)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
+	writeDiagnosisKeys(buf, diagKeys)
+	s.cache.Set(buf.Bytes())
+
+	return nil
+}
+
+func (s Service) refreshCache(ctx context.Context) error {
+	t := time.NewTicker(5 * time.Minute)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.C:
+			if err := s.hydrateCache(ctx); err != nil {
+				log.Printf("Could not refresh cache: %v", err)
+			}
+		}
+	}
 }

@@ -1,28 +1,33 @@
 package diag
 
 import (
-	"io"
 	"sync"
 )
 
 // Cache defines an interface for caching binary Diagnosis Key data, to be used
 // in between clients and the repository for listing keys.
 type Cache interface {
+	// Get retrieves the contents from the cache.
+	// Underlying data should *not* be mutated.
+	Get() []byte
 	// Set replaces the cache.
 	Set([]byte)
 	// Add appends to the cache.
 	Add([]byte)
-	// WriteTo writes the cache to an io.Writer.
-	WriteTo(w io.Writer) (int64, error)
 	// Size returns the byte size of the cache.
 	Size() int
 }
 
 // MemoryCache represents an in-memory cache.
-// Uses a r/w mutex to ensure data integrity when the cache is being updated.
+// The mutex is used to prevent concurrent appending to the slice.
 type MemoryCache struct {
 	buf []byte
-	mu  sync.RWMutex
+	mu  sync.Mutex
+}
+
+// Get returns the buffer from the cache.
+func (mc *MemoryCache) Get() []byte {
+	return mc.buf
 }
 
 // Set overwrites the cache.
@@ -39,17 +44,7 @@ func (mc *MemoryCache) Add(buf []byte) {
 	mc.buf = append(mc.buf, buf...)
 }
 
-// WriteTo writes the contents of the cache to an io.Writer.
-func (mc *MemoryCache) WriteTo(w io.Writer) (int64, error) {
-	mc.mu.RLock()
-	defer mc.mu.RUnlock()
-	n, err := w.Write(mc.buf)
-	return int64(n), err
-}
-
 // Size returns the cache size.
 func (mc *MemoryCache) Size() int {
-	mc.mu.RLock()
-	defer mc.mu.RUnlock()
 	return len(mc.buf)
 }
