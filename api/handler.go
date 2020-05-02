@@ -16,8 +16,8 @@ type handler struct {
 }
 
 // NewHandler returns a new Handler.
-func NewHandler(ctx context.Context, repo diag.Repository, cache diag.Cache) (http.Handler, error) {
-	diagSvc, err := diag.NewService(ctx, repo, cache)
+func NewHandler(ctx context.Context, cfg diag.Config) (http.Handler, error) {
+	diagSvc, err := diag.NewService(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,8 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.
 func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
-	maxBytesReader := http.MaxBytesReader(w, r.Body, diag.UploadLimit)
+	uploadLimit := h.diagSvc.MaxUploadBatchSize() * diag.DiagnosisKeySize
+	maxBytesReader := http.MaxBytesReader(w, r.Body, int64(uploadLimit))
 	diagKeys, err := diag.ParseDiagnosisKeys(maxBytesReader)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid body: %v", err), http.StatusBadRequest)

@@ -35,12 +35,11 @@ var noopRepo = testRepository{
 	findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
 }
 
-func newTestHandler(t *testing.T, repo diag.Repository) http.Handler {
-	cache := &diag.MemoryCache{}
-	if repo == nil {
-		repo = noopRepo
+func newTestHandler(t *testing.T, cfg *diag.Config) http.Handler {
+	if cfg == nil {
+		cfg = &diag.Config{Repository: noopRepo}
 	}
-	handler, err := NewHandler(context.Background(), repo, cache)
+	handler, err := NewHandler(context.Background(), *cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,12 +73,7 @@ func TestHealth(t *testing.T) {
 
 func TestListDiagnosisKeys(t *testing.T) {
 	t.Run("no diagnosis keys found", func(t *testing.T) {
-		repo := testRepository{
-			findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
-				return nil, nil
-			},
-		}
-		handler := newTestHandler(t, repo)
+		handler := newTestHandler(t, nil)
 		req := httptest.NewRequest("GET", "http://example.com/diagnosis-keys", nil)
 		w := httptest.NewRecorder()
 
@@ -104,13 +98,15 @@ func TestListDiagnosisKeys(t *testing.T) {
 				ENIntervalNumber:     uint32(42),
 			},
 		}
-		repo := testRepository{
-			findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
-				return expDiagKeys, nil
+		cfg := &diag.Config{
+			Repository: testRepository{
+				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
+					return expDiagKeys, nil
+				},
 			},
 		}
 
-		handler := newTestHandler(t, repo)
+		handler := newTestHandler(t, cfg)
 		req := httptest.NewRequest("GET", "http://example.com/diagnosis-keys", nil)
 		w := httptest.NewRecorder()
 
@@ -213,8 +209,14 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			ENIntervalNumber:     uint32(42),
 		}
 
+		cfg := &diag.Config{
+			Repository:         noopRepo,
+			MaxUploadBatchSize: 7,
+		}
+		handler := newTestHandler(t, cfg)
+
 		buf := &bytes.Buffer{}
-		for i := 0; i < diag.MaxUploadBatchSize+1; i++ {
+		for i := 0; i < int(cfg.MaxUploadBatchSize)+1; i++ {
 			_, err := buf.Write(diagKey.TemporaryExposureKey[:])
 			if err != nil {
 				panic(err)
@@ -224,7 +226,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 				panic(err)
 			}
 		}
-		handler := newTestHandler(t, nil)
+
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", buf)
 		w := httptest.NewRecorder()
 
@@ -273,14 +275,16 @@ func TestPostDiagnosisKeys(t *testing.T) {
 
 		t.Run("diag.Service returns nil error", func(t *testing.T) {
 			var storedDiagKeys []diag.DiagnosisKey
-			repo := testRepository{
-				storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
-					storedDiagKeys = diagKeys
-					return nil
+			cfg := &diag.Config{
+				Repository: testRepository{
+					storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
+						storedDiagKeys = diagKeys
+						return nil
+					},
+					findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
 				},
-				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
 			}
-			handler := newTestHandler(t, repo)
+			handler := newTestHandler(t, cfg)
 
 			req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", validBody())
 			w := httptest.NewRecorder()
@@ -309,13 +313,14 @@ func TestPostDiagnosisKeys(t *testing.T) {
 		})
 
 		t.Run("diag.Service returns unexpected error", func(t *testing.T) {
-			repo := testRepository{
-				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
-				storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
-					return errors.New("foobar")
-				},
-			}
-			handler := newTestHandler(t, repo)
+			cfg := &diag.Config{
+				Repository: testRepository{
+					findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
+					storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
+						return errors.New("foobar")
+					},
+				}}
+			handler := newTestHandler(t, cfg)
 
 			req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", validBody())
 			w := httptest.NewRecorder()

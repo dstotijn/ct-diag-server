@@ -15,8 +15,12 @@ import (
 func main() {
 	ctx := context.Background()
 
-	var addr string
+	var (
+		addr               string
+		maxUploadBatchSize uint
+	)
 	flag.StringVar(&addr, "addr", ":80", "HTTP listen address")
+	flag.UintVar(&maxUploadBatchSize, "maxUploadBatchSize", 14, "Maximum upload batch size")
 	flag.Parse()
 
 	db, err := postgres.New(mustGetEnv("POSTGRES_DSN"))
@@ -30,10 +34,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Use in-memory cache for serving Diagnosis Keys.
-	cache := &diag.MemoryCache{}
-
-	handler, err := api.NewHandler(ctx, db, cache)
+	cfg := diag.Config{
+		Repository:         db,
+		Cache:              &diag.MemoryCache{},
+		MaxUploadBatchSize: maxUploadBatchSize,
+	}
+	handler, err := api.NewHandler(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

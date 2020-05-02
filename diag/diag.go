@@ -13,16 +13,11 @@ import (
 )
 
 const (
-	// MaxUploadBatchSize is the maximum amount of diagnosis keys to be
-	// uploaded per request.
-	MaxUploadBatchSize = 14
-
 	// DiagnosisKeySize is the size of a `Diagnosis Key`, consisting of a
 	// `TemporaryExposureKey` (16 bytes) and a `ENIntervalNumber` (4 bytes).
 	DiagnosisKeySize = 20
 
-	// UploadLimit is the size limit for uploading diagnosis keys in bytes.
-	UploadLimit = MaxUploadBatchSize * DiagnosisKeySize
+	defaultMaxUploadBatchSize = 14
 )
 
 var (
@@ -52,15 +47,34 @@ type Repository interface {
 
 // Service represents the service for managing diagnosis keys.
 type Service struct {
-	repo  Repository
-	cache Cache
+	repo               Repository
+	cache              Cache
+	maxUploadBatchSize uint
+}
+
+// Config represents the configuration to create a Service.
+type Config struct {
+	Repository         Repository
+	Cache              Cache
+	MaxUploadBatchSize uint
 }
 
 // NewService returns a new Service.
-func NewService(ctx context.Context, repo Repository, cache Cache) (Service, error) {
+func NewService(ctx context.Context, cfg Config) (Service, error) {
 	svc := Service{
-		repo:  repo,
-		cache: cache,
+		repo:               cfg.Repository,
+		cache:              cfg.Cache,
+		maxUploadBatchSize: cfg.MaxUploadBatchSize,
+	}
+
+	// Default to in-memory cache.
+	if svc.cache == nil {
+		svc.cache = &MemoryCache{}
+	}
+
+	// Set sane default for max upload batch size.
+	if svc.maxUploadBatchSize == 0 {
+		svc.maxUploadBatchSize = defaultMaxUploadBatchSize
 	}
 
 	// Hydrate cache.
@@ -108,8 +122,6 @@ func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 		return nil, err
 	case n == 0:
 		return nil, io.ErrUnexpectedEOF
-	case n > UploadLimit:
-		return nil, ErrMaxUploadExceeded
 	case n%DiagnosisKeySize != 0:
 		return nil, io.ErrUnexpectedEOF
 	}
@@ -132,6 +144,12 @@ func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 // ItemCount returns the amount of known diagnosis keys.
 func (s Service) ItemCount() int {
 	return s.cache.Size() / DiagnosisKeySize
+}
+
+// MaxUploadBatchSize returns the maximum number of diagnosis keys to be uploaded
+// per request.
+func (s Service) MaxUploadBatchSize() uint {
+	return s.maxUploadBatchSize
 }
 
 // WriteDiagnosisKeys writes a stream of Diagnosis Keys to an io.Writer.
