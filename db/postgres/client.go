@@ -113,6 +113,9 @@ func (c *Client) LastModified(ctx context.Context) (time.Time, error) {
 	query := `SELECT created_at FROM diagnosis_keys ORDER BY created_at DESC LIMIT 1`
 
 	err := c.db.QueryRowContext(ctx, query).Scan(&lastModified)
+	if err == sql.ErrNoRows {
+		return time.Time{}, diag.ErrNilDiagKeys
+	}
 	if err != nil {
 		return time.Time{}, fmt.Errorf("postgres: could not execute query: %v", err)
 	}

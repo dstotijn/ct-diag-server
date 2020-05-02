@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/rand"
 	"log"
 	"os"
 	"reflect"
@@ -207,6 +208,99 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 
 			if !reflect.DeepEqual(diagKeys, tt.expDiagKeys) {
 				t.Errorf("expected: %#v, got: %#v", tt.expDiagKeys, diagKeys)
+			}
+		})
+	}
+}
+
+func TestLastModified(t *testing.T) {
+	ctx := context.Background()
+
+	_, err := client.db.ExecContext(ctx, "TRUNCATE diagnosis_keys")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	randomTEK := func() (buf [16]byte) {
+		if _, err := rand.Read(buf[:]); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+
+	type storeReq struct {
+		diagKey      diag.DiagnosisKey
+		lastModified time.Time
+	}
+
+	tests := []struct {
+		name            string
+		storeReq        []storeReq
+		expLastModified time.Time
+		expError        error
+	}{
+		{
+			name:            "no diagnosis keys in database",
+			storeReq:        nil,
+			expLastModified: time.Time{},
+			expError:        diag.ErrNilDiagKeys,
+		},
+		{
+			name: "diagnosis keys in database",
+			storeReq: []storeReq{
+				{
+					diagKey: diag.DiagnosisKey{
+						TemporaryExposureKey: randomTEK(),
+						ENIntervalNumber:     uint32(42),
+					},
+					lastModified: time.Unix(42, 0),
+				},
+				{
+					diagKey: diag.DiagnosisKey{
+						TemporaryExposureKey: randomTEK(),
+						ENIntervalNumber:     uint32(42),
+					},
+					lastModified: time.Unix(43, 0),
+				},
+			},
+			expLastModified: time.Unix(43, 0),
+			expError:        nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx, err := client.db.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback()
+
+			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stmt.Close()
+
+			for _, storeReq := range tt.storeReq {
+				_, err = stmt.ExecContext(ctx, storeReq.diagKey.TemporaryExposureKey[:], storeReq.diagKey.ENIntervalNumber, storeReq.lastModified)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			lastModified, err := client.LastModified(ctx)
+			if err != tt.expError {
+				t.Fatalf("expected: %v, got: %v", tt.expError, err)
+			}
+
+			if !lastModified.Equal(tt.expLastModified) {
+				t.Errorf("expected: %v, got: %v", tt.expLastModified, lastModified)
 			}
 		})
 	}
