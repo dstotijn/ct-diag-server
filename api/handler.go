@@ -6,25 +6,30 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/dstotijn/ct-diag-server/diag"
+
+	"go.uber.org/zap"
 )
 
 type handler struct {
 	diagSvc diag.Service
+	logger  *zap.Logger
 }
 
 // NewHandler returns a new Handler.
-func NewHandler(ctx context.Context, cfg diag.Config) (http.Handler, error) {
+func NewHandler(ctx context.Context, cfg diag.Config, logger *zap.Logger) (http.Handler, error) {
 	diagSvc, err := diag.NewService(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	h := handler{diagSvc: diagSvc}
+	h := handler{
+		diagSvc: diagSvc,
+		logger:  logger,
+	}
 
 	mux := http.NewServeMux()
 
@@ -74,7 +79,7 @@ func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 
 	err = h.diagSvc.StoreDiagnosisKeys(r.Context(), diagKeys)
 	if err != nil {
-		log.Printf("api: error storing diagnosis keys: %v", err)
+		h.logger.Error("Could not store diagnosis keys", zap.Error(err))
 		writeInternalErrorResp(w, err)
 		return
 	}

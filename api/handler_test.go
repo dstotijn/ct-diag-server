@@ -15,6 +15,8 @@ import (
 	"testing"
 
 	"github.com/dstotijn/ct-diag-server/diag"
+
+	"go.uber.org/zap"
 )
 
 type testRepository struct {
@@ -39,10 +41,17 @@ func newTestHandler(t *testing.T, cfg *diag.Config) http.Handler {
 	if cfg == nil {
 		cfg = &diag.Config{Repository: noopRepo}
 	}
-	handler, err := NewHandler(context.Background(), *cfg)
+
+	logger := zap.NewNop()
+	if cfg.Logger == nil {
+		cfg.Logger = logger
+	}
+
+	handler, err := NewHandler(context.Background(), *cfg, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return handler
 }
 

@@ -3,6 +3,7 @@ services:
   ct-diag-server:
     build:
       context: .
+    command: ["-dev"]
     environment:
       POSTGRES_DSN: "postgres://ct-diag:${POSTGRES_PASSWORD}@postgres:5432?sslmode=disable"
     restart: on-failure

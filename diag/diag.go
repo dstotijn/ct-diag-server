@@ -11,8 +11,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -53,6 +54,7 @@ type Service struct {
 	repo               Repository
 	cache              Cache
 	maxUploadBatchSize uint
+	logger             *zap.Logger
 }
 
 // Config represents the configuration to create a Service.
@@ -60,14 +62,19 @@ type Config struct {
 	Repository         Repository
 	Cache              Cache
 	MaxUploadBatchSize uint
+	Logger             *zap.Logger
 }
 
 // NewService returns a new Service.
 func NewService(ctx context.Context, cfg Config) (Service, error) {
+	if cfg.Logger == nil {
+		return Service{}, errors.New("diag: logger cannot be nil")
+	}
 	svc := Service{
 		repo:               cfg.Repository,
 		cache:              cfg.Cache,
 		maxUploadBatchSize: cfg.MaxUploadBatchSize,
+		logger:             cfg.Logger,
 	}
 
 	// Default to in-memory cache.
@@ -84,11 +91,12 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 	if err := svc.hydrateCache(ctx); err != nil {
 		return Service{}, fmt.Errorf("diag: could not hydrate cache: %v", err)
 	}
+	svc.logger.Info("Cache hydrated.", zap.Int("size", svc.cache.Size()))
 
 	// Run cache refresh worker in separate goroutine.
 	go func() {
 		if err := svc.refreshCache(ctx); err != nil && err != context.Canceled {
-			log.Printf("Could not refresh cache: %v", err)
+			svc.logger.Error("Could not refresh cache.", zap.Error(err))
 		}
 	}()
 
@@ -105,6 +113,7 @@ func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey
 		buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
 		writeDiagnosisKeys(buf, diagKeys)
 		s.cache.Add(buf.Bytes())
+		s.logger.Info("Stored new diagnosis keys.", zap.Int("count", len(diagKeys)))
 	}()
 
 	return nil
@@ -156,9 +165,14 @@ func (s Service) MaxUploadBatchSize() uint {
 }
 
 // WriteDiagnosisKeys writes a stream of Diagnosis Keys to an io.Writer.
-func (s Service) WriteDiagnosisKeys(w io.Writer) (int, error) {
+func (s Service) WriteDiagnosisKeys(w io.Writer) (n int, err error) {
 	buf := s.cache.Get()
-	return w.Write(buf)
+	n, err = w.Write(buf)
+	s.logger.Debug("Finished writing Diagnosis Keys.",
+		zap.Int("bytesWritten", n),
+		zap.Error(err),
+	)
+	return
 }
 
 func writeDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
@@ -203,8 +217,9 @@ func (s Service) refreshCache(ctx context.Context) error {
 			return ctx.Err()
 		case <-t.C:
 			if err := s.hydrateCache(ctx); err != nil {
-				log.Printf("Could not refresh cache: %v", err)
+				s.logger.Error("Could not refresh cache", zap.Error(err))
 			}
+			s.logger.Info("Cache refreshed.", zap.Int("size", s.cache.Size()))
 		}
 	}
 }
