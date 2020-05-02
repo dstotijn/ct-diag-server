@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/dstotijn/ct-diag-server/diag"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type handler struct {
@@ -27,9 +28,9 @@ func NewHandler(ctx context.Context, cfg diag.Config) (http.Handler, error) {
 	h := handler{diagSvc: diagSvc}
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/diagnosis-keys", h.diagnosisKeys)
 	mux.HandleFunc("/health", h.health)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	return mux, nil
 }
