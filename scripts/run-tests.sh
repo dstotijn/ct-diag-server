@@ -15,7 +15,7 @@ trap clean EXIT
 docker run --rm --name $NAME -d -p $PORT:5432 \
   -e POSTGRES_USER=$NAME \
   -e POSTGRES_PASSWORD=$NAME \
-  -v $PWD/postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql \
+  -v $PWD/db/postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql \
   postgres:11.7-alpine
 
 go test ./... -v -count=1

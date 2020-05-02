@@ -34,7 +34,7 @@ jobs: # basic units of work in a run
 
       - run:
           name: Create database schema
-          command: /usr/bin/psql -d "postgres://circleci-demo-go:circleci-demo-go@localhost:5432/circle_test?sslmode=disable" < postgres/schema.sql
+          command: /usr/bin/psql -d "postgres://circleci-demo-go:circleci-demo-go@localhost:5432/circle_test?sslmode=disable" < db/postgres/schema.sql
 
       - run:
           name: Run unit tests

@@ -18,6 +18,6 @@ services:
       POSTGRES_USER: ct-diag
       POSTGRES_PASSWORD:
     volumes:
-      - ./postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./db/postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
       - "5432:5432"
