@@ -102,7 +102,7 @@ func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey
 	}
 
 	go func() {
-		buf := bytes.NewBuffer(make([]byte, len(diagKeys)*DiagnosisKeySize))
+		buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
 		writeDiagnosisKeys(buf, diagKeys)
 		s.cache.Add(buf.Bytes())
 	}()
