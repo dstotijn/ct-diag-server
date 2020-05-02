@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	// ErrNilDiagKeys is used when an empty diagnosis keyset is used.
-	ErrNilDiagKeys = errors.New("diag: diagnosis key array cannot be empty")
+	// ErrNilDiagKeys is used when an empty diagnosis keyset is encountered.
+	ErrNilDiagKeys = errors.New("diag: diagnosis keys is nil")
 
 	// ErrMaxUploadExceeded is used when upload batch size exceeds the limit.
 	ErrMaxUploadExceeded = errors.New("diag: maximum upload batch size exceeded")
@@ -45,8 +45,9 @@ type DiagnosisKey struct {
 // Repository defines an interface for storing and retrieving diagnosis keys
 // in a repository.
 type Repository interface {
-	StoreDiagnosisKeys(context.Context, []DiagnosisKey) error
-	FindAllDiagnosisKeys(context.Context) ([]DiagnosisKey, error)
+	StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey, createdAt time.Time) error
+	FindAllDiagnosisKeys(ctx context.Context) ([]DiagnosisKey, error)
+	LastModified(ctx context.Context) (time.Time, error)
 }
 
 // Service represents the service for managing diagnosis keys.
@@ -105,14 +106,16 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 
 // StoreDiagnosisKeys persists a set of diagnosis keys to the repository.
 func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey) error {
-	if err := s.repo.StoreDiagnosisKeys(ctx, diagKeys); err != nil {
+	now := time.Now().UTC()
+
+	if err := s.repo.StoreDiagnosisKeys(ctx, diagKeys, now); err != nil {
 		return err
 	}
 
 	go func() {
 		buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
 		writeDiagnosisKeys(buf, diagKeys)
-		s.cache.Add(buf.Bytes())
+		s.cache.Add(buf.Bytes(), now)
 		s.logger.Info("Stored new diagnosis keys.", zap.Int("count", len(diagKeys)))
 	}()
 
@@ -151,6 +154,16 @@ func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 	}
 
 	return diagKeys, nil
+}
+
+// ReadSeeker returns an io.ReadSeeker for accessing the cache.
+func (s Service) ReadSeeker() io.ReadSeeker {
+	return s.cache.ReadSeeker()
+}
+
+// LastModified returns the timestamp of the latest Diagnosis Key upload.
+func (s Service) LastModified() time.Time {
+	return s.cache.LastModified().UTC()
 }
 
 // ItemCount returns the amount of known diagnosis keys.
@@ -202,9 +215,14 @@ func (s Service) hydrateCache(ctx context.Context) error {
 		return err
 	}
 
+	lastModified, err := s.repo.LastModified(ctx)
+	if err != nil && err != ErrNilDiagKeys {
+		return err
+	}
+
 	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
 	writeDiagnosisKeys(buf, diagKeys)
-	s.cache.Set(buf.Bytes())
+	s.cache.Set(buf.Bytes(), lastModified)
 
 	return nil
 }

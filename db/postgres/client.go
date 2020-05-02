@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -42,9 +43,13 @@ func (c *Client) Close() error {
 }
 
 // StoreDiagnosisKeys persists an array of diagnosis keys in the database.
-func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.DiagnosisKey) error {
+func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.DiagnosisKey, createdAt time.Time) error {
 	if len(diagKeys) == 0 {
 		return diag.ErrNilDiagKeys
+	}
+
+	if createdAt.IsZero() {
+		return errors.New("postgres: createdAt cannot be empty")
 	}
 
 	tx, err := c.db.BeginTx(ctx, nil)
@@ -52,8 +57,6 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 		return fmt.Errorf("postgres: could not start transaction: %v", err)
 	}
 	defer tx.Rollback()
-
-	createdAt := time.Now()
 
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)
 	ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING`)
@@ -102,4 +105,17 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	}
 
 	return diagKeys, nil
+}
+
+// LastModified returns the timestamp of the latest uploaded Diagnosis Key.
+func (c *Client) LastModified(ctx context.Context) (time.Time, error) {
+	var lastModified time.Time
+	query := `SELECT created_at FROM diagnosis_keys ORDER BY created_at DESC LIMIT 1`
+
+	err := c.db.QueryRowContext(ctx, query).Scan(&lastModified)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("postgres: could not execute query: %v", err)
+	}
+
+	return lastModified, nil
 }

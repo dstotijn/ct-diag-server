@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dstotijn/ct-diag-server/diag"
 
@@ -20,21 +21,27 @@ import (
 )
 
 type testRepository struct {
-	storeDiagnosisKeysFn   func(context.Context, []diag.DiagnosisKey) error
+	storeDiagnosisKeysFn   func(context.Context, []diag.DiagnosisKey, time.Time) error
 	findAllDiagnosisKeysFn func(context.Context) ([]diag.DiagnosisKey, error)
+	lastModifiedFn         func(context.Context) (time.Time, error)
 }
 
-func (ts testRepository) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.DiagnosisKey) error {
-	return ts.storeDiagnosisKeysFn(ctx, diagKeys)
+func (ts testRepository) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.DiagnosisKey, createdAt time.Time) error {
+	return ts.storeDiagnosisKeysFn(ctx, diagKeys, createdAt)
 }
 
 func (ts testRepository) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
 	return ts.findAllDiagnosisKeysFn(ctx)
 }
 
+func (ts testRepository) LastModified(ctx context.Context) (time.Time, error) {
+	return ts.lastModifiedFn(ctx)
+}
+
 var noopRepo = testRepository{
-	storeDiagnosisKeysFn:   func(_ context.Context, _ []diag.DiagnosisKey) error { return nil },
+	storeDiagnosisKeysFn:   func(_ context.Context, _ []diag.DiagnosisKey, _ time.Time) error { return nil },
 	findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
+	lastModifiedFn:         func(_ context.Context) (time.Time, error) { return time.Time{}, nil },
 }
 
 func newTestHandler(t *testing.T, cfg *diag.Config) http.Handler {
@@ -107,11 +114,13 @@ func TestListDiagnosisKeys(t *testing.T) {
 				ENIntervalNumber:     uint32(42),
 			},
 		}
+		expLastModified := time.Date(2020, time.May, 2, 23, 30, 0, 0, time.UTC)
 		cfg := &diag.Config{
 			Repository: testRepository{
 				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
 					return expDiagKeys, nil
 				},
+				lastModifiedFn: func(_ context.Context) (time.Time, error) { return expLastModified, nil },
 			},
 		}
 
@@ -130,6 +139,10 @@ func TestListDiagnosisKeys(t *testing.T) {
 		expContentLength := strconv.Itoa(len(expDiagKeys) * 20)
 		if got := resp.Header.Get("Content-Length"); got != expContentLength {
 			t.Fatalf("expected: %v, got: %v", expContentLength, got)
+		}
+
+		if got := resp.Header.Get("Last-Modified"); got != expLastModified.Format(http.TimeFormat) {
+			t.Fatalf("expected: %v, got: %v", expLastModified.Format(http.TimeFormat), got)
 		}
 
 		var got []diag.DiagnosisKey
@@ -286,11 +299,12 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			var storedDiagKeys []diag.DiagnosisKey
 			cfg := &diag.Config{
 				Repository: testRepository{
-					storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
+					storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey, _ time.Time) error {
 						storedDiagKeys = diagKeys
 						return nil
 					},
-					findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
+					lastModifiedFn:         noopRepo.lastModifiedFn,
+					findAllDiagnosisKeysFn: noopRepo.findAllDiagnosisKeysFn,
 				},
 			}
 			handler := newTestHandler(t, cfg)
@@ -324,10 +338,11 @@ func TestPostDiagnosisKeys(t *testing.T) {
 		t.Run("diag.Service returns unexpected error", func(t *testing.T) {
 			cfg := &diag.Config{
 				Repository: testRepository{
-					findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
-					storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey) error {
+					findAllDiagnosisKeysFn: noopRepo.findAllDiagnosisKeysFn,
+					storeDiagnosisKeysFn: func(_ context.Context, diagKeys []diag.DiagnosisKey, _ time.Time) error {
 						return errors.New("foobar")
 					},
+					lastModifiedFn: noopRepo.lastModifiedFn,
 				}}
 			handler := newTestHandler(t, cfg)
 

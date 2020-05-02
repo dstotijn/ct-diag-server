@@ -3,11 +3,9 @@
 package api
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/dstotijn/ct-diag-server/diag"
 
@@ -42,6 +40,8 @@ func NewHandler(ctx context.Context, cfg diag.Config, logger *zap.Logger) (http.
 // diagnosisKeys handles both GET and POST requests.
 func (h *handler) diagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
+	case http.MethodHead:
+		fallthrough
 	case http.MethodGet:
 		h.listDiagnosisKeys(w, r)
 	case http.MethodPost:
@@ -57,14 +57,9 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	itemCount := h.diagSvc.ItemCount()
-	w.Header().Set("Content-Length", strconv.Itoa(itemCount*diag.DiagnosisKeySize))
-
-	bw := bufio.NewWriter(w)
-	if _, err := h.diagSvc.WriteDiagnosisKeys(bw); err != nil {
-		return
-	}
-	bw.Flush()
+	rs := h.diagSvc.ReadSeeker()
+	lastModified := h.diagSvc.LastModified()
+	http.ServeContent(w, r, "", lastModified, rs)
 }
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.

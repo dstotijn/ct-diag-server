@@ -96,7 +96,7 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := client.StoreDiagnosisKeys(ctx, tt.diagKeys)
+			err := client.StoreDiagnosisKeys(ctx, tt.diagKeys, time.Now())
 			if err != tt.expError {
 				t.Fatalf("expected: %v, got: %v", tt.expError, err)
 			}

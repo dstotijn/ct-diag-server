@@ -80,18 +80,25 @@ regarded as public; it doesn't contain PII.
 
 `GET /diagnosis-keys`
 
+The endpoint supports byte range requests as defined in [RFC 7233](https://tools.ietf.org/html/rfc7233).
+The `HEAD` method may be used to obtain `Last-Modified` and `Content-Length` headers
+for cache control purposes.
+
 #### Response
 
-A `200 OK` response should be expected, both for an empty and a non-empty reply.
+A `200 OK` response should be expected for normal requests (non-empty and empty),
+and `206 Partial Content` for responses to byte range requests.
 In case of an empty reply, a `Content-Length: 0` header is written.
+
 A `500 Internal Server Error` response indicates server failure, and warrants a retry.
 
 #### Response headers
 
-| Name                                     | Description                                                                  |
-| ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `Content-Type: application/octet-stream` | The HTTP response is a bytestream of Diagnosis Keys (see below).             |
-| `Content-Length: {n * 20}`               | Content length is `n * 20`, where `n` is the amount of found Diagnosis Keys. |
+| Name                                             | Description                                                                                                                       |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Type: application/octet-stream`         | The HTTP response is a bytestream of Diagnosis Keys (see below).                                                                  |
+| `Content-Length: {n * 20}`                       | Content length is `n * 20`, where `n` is the amount of returned Diagnosis Keys (byte range requests may yield different lengths). |
+| `Cache-Control: public, max-age=0, s-maxage=600` | For (upstream) caching purposes, this header may be used.                                                                         |
 
 #### Response body
 
@@ -137,8 +144,6 @@ in a `text/plain; charset=utf-8` response body.
 
 ## TODO
 
-- [ ] Support byte ranges for listing Diagnosis Keys.
-- [ ] Add script (optionally worker) to delete keys > 14 days.
 - [ ] Add `since` query parameter to `listDiagnosisKeys` endpoint to allow
       offsetting the Diagnosis Key list by upload date to minimize data sent over the wire.
 - [ ] Write benchmarks.
