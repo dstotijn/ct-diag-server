@@ -116,7 +116,8 @@ Any request headers (e.g. `Content-Length` and `Content-Type`) are not needed.
 
 #### Body
 
-The HTTP request body should be a bytestream of `1 <= 14` Diagnosis Keys.
+The HTTP request body should be a bytestream of `1 <= n` Diagnosis Keys, where
+`n` is the max upload batch size configured on the server (default: 14).
 A diagnosis key consists of two parts: the `TemporaryExposureKey` itself (16 bytes),
 and 2 bytes (big endian) to denote the `ENIntervalNumber` (see above). Because
 the amount of bytes per diagnosis key is fixed, there is no delimiter.

@@ -30,8 +30,8 @@ func main() {
 		batchSize int
 	)
 
-	flag.StringVar(&baseURL, "baseURL", "http://localhost", "Base URL of cg-diag-server")
-	flag.StringVar(&action, "action", actionList, "Action (default: `list`, allowed values: `list`, `post`)")
+	flag.StringVar(&baseURL, "baseURL", "http://localhost:8080", "Base URL of cg-diag-server")
+	flag.StringVar(&action, "action", actionList, "Action (allowed values: `list`, `post`)")
 	flag.IntVar(&batchSize, "batchSize", 14, "Diagnosis Key batch size, used when posting keys")
 	flag.Parse()
 

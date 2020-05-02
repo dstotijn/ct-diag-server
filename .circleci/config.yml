@@ -58,7 +58,7 @@ jobs: # basic units of work in a run
           name: Send coverage to Coveralls
           command: goveralls -coverprofile=${TEST_RESULTS}/coverage.out -service=circle-ci -repotoken=${COVERALLS_REPO_TOKEN}
 
-      - run: make # pull and build dependencies for the project
+      - run: make build-ci # pull and build dependencies for the project
 
       - save_cache:
           key: go-mod-v4-{{ checksum "go.sum" }}

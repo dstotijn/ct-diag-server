@@ -1,8 +1,6 @@
 package diag
 
-import (
-	"sync"
-)
+import "sync"
 
 // Cache defines an interface for caching binary Diagnosis Key data, to be used
 // in between clients and the repository for listing keys.

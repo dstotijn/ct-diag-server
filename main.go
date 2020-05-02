@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"github.com/dstotijn/ct-diag-server/api"
+	"github.com/dstotijn/ct-diag-server/db/postgres"
 	"github.com/dstotijn/ct-diag-server/diag"
-	"github.com/dstotijn/ct-diag-server/postgres"
 )
 
 func main() {
