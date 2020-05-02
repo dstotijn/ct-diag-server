@@ -1,3 +1,5 @@
+// Package api provides an http.Handler with handlers for uploading and retrieving
+// Diagnosis Keys.
 package api
 
 import (

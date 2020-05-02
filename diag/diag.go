@@ -1,3 +1,6 @@
+// Package diag provides a service for parsing, storing and writing Diagnosis
+// Keys. Because the server is load heavy, it has a cache interface to unburden
+// the repository.
 package diag
 
 import (

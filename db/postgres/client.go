@@ -1,3 +1,5 @@
+// Package postgres provides an implementation of diag.Repository using PostgreSQL
+// for underlying database storage.
 package postgres
 
 import (
