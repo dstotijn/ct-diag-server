@@ -88,7 +88,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 
 	for rows.Next() {
 		var diagKey diag.DiagnosisKey
-		key := make([]byte, 16)
+		key := make([]byte, 0, 16)
 		if err := rows.Scan(&key, &diagKey.ENIntervalNumber); err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}

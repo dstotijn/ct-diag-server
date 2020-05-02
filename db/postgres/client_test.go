@@ -111,7 +111,7 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 
 			for rows.Next() {
 				var diagKey diag.DiagnosisKey
-				key := make([]byte, 16)
+				key := make([]byte, 0, 16)
 				err := rows.Scan(&key, &diagKey.ENIntervalNumber)
 				if err != nil {
 					t.Fatal(err)
