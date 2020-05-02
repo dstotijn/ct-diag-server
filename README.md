@@ -140,7 +140,7 @@ in a `text/plain; charset=utf-8` response body.
 - [ ] Support byte ranges for listing Diagnosis Keys.
 - [ ] Add script (optionally worker) to delete keys > 14 days.
 - [ ] Add `since` query parameter to `listDiagnosisKeys` endpoint to allow
-      offsetting the Diagnosis Key list by `ENIntervalNumber` to minimize data sent over the wire.
+      offsetting the Diagnosis Key list by upload date to minimize data sent over the wire.
 - [ ] Write benchmarks.
 - [ ] Add FAQ and/or guide for server operators.
 
