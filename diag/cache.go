@@ -10,13 +10,10 @@ import (
 // Cache defines an interface for caching binary Diagnosis Key data, to be used
 // in between clients and the repository for listing keys.
 type Cache interface {
-	// Get retrieves the contents from the cache.
-	// Underlying data should *not* be mutated.
-	Get() []byte
 	// Set replaces the cache.
-	Set(buf []byte, lastModified time.Time)
+	Set(diagKeys []DiagnosisKey, lastModified time.Time) error
 	// Add appends to the cache.
-	Add(buf []byte, lastModified time.Time)
+	Add(diagKeys []DiagnosisKey, lastModified time.Time) error
 	// Size returns the byte size of the cache.
 	Size() int
 	// LastModified returns the timestamp of the latest uploaded Diagnosis Key.
@@ -33,25 +30,36 @@ type MemoryCache struct {
 	mu           sync.Mutex
 }
 
-// Get returns the buffer from the cache.
-func (mc *MemoryCache) Get() []byte {
-	return mc.buf
-}
-
 // Set overwrites the cache.
-func (mc *MemoryCache) Set(buf []byte, lastModified time.Time) {
+func (mc *MemoryCache) Set(diagKeys []DiagnosisKey, lastModified time.Time) error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
-	mc.buf = buf
+
+	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
+	if err := writeDiagnosisKeys(buf, diagKeys); err != nil {
+		return err
+	}
+
+	mc.buf = buf.Bytes()
 	mc.lastModified = lastModified
+
+	return nil
 }
 
-// Add adds items to the cache.
-func (mc *MemoryCache) Add(buf []byte, lastModified time.Time) {
+// Add appends items to the cache.
+func (mc *MemoryCache) Add(diagKeys []DiagnosisKey, lastModified time.Time) error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
-	mc.buf = append(mc.buf, buf...)
+
+	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
+	if err := writeDiagnosisKeys(buf, diagKeys); err != nil {
+		return err
+	}
+
+	mc.buf = append(mc.buf, buf.Bytes()...)
 	mc.lastModified = lastModified
+
+	return nil
 }
 
 // Size returns the cache size.

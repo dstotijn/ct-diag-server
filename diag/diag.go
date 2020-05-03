@@ -4,7 +4,6 @@
 package diag
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -113,10 +112,11 @@ func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey
 	}
 
 	go func() {
-		buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
-		writeDiagnosisKeys(buf, diagKeys)
-		s.cache.Add(buf.Bytes(), now)
-		s.logger.Info("Stored new diagnosis keys.", zap.Int("count", len(diagKeys)))
+		if err := s.cache.Add(diagKeys, now); err != nil {
+			s.logger.Error("Could not add to cache.", zap.Error(err))
+			return
+		}
+		s.logger.Info("Cached new diagnosis keys.", zap.Int("count", len(diagKeys)))
 	}()
 
 	return nil
@@ -177,17 +177,6 @@ func (s Service) MaxUploadBatchSize() uint {
 	return s.maxUploadBatchSize
 }
 
-// WriteDiagnosisKeys writes a stream of Diagnosis Keys to an io.Writer.
-func (s Service) WriteDiagnosisKeys(w io.Writer) (n int, err error) {
-	buf := s.cache.Get()
-	n, err = w.Write(buf)
-	s.logger.Debug("Finished writing Diagnosis Keys.",
-		zap.Int("bytesWritten", n),
-		zap.Error(err),
-	)
-	return
-}
-
 func writeDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
 	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
@@ -216,13 +205,16 @@ func (s Service) hydrateCache(ctx context.Context) error {
 	}
 
 	lastModified, err := s.repo.LastModified(ctx)
-	if err != nil && err != ErrNilDiagKeys {
+	if err == ErrNilDiagKeys {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 
-	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
-	writeDiagnosisKeys(buf, diagKeys)
-	s.cache.Set(buf.Bytes(), lastModified)
+	if err := s.cache.Set(diagKeys, lastModified); err != nil {
+		return err
+	}
 
 	return nil
 }
