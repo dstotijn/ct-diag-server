@@ -66,7 +66,7 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
 ## API reference
 
 💡 Check out the [OpenAPI reference](https://app.swaggerhub.com/apis/dstotijn84/ct-diag-server)
-or import [openapi.yaml](openapi.yaml) in a compatible client for exploring the
+or import [openapi.yaml](docs/openapi.yaml) in a compatible client for exploring the
 API and creating client code stubs. Also check out the [example client code](examples/client/main.go).
 
 ### Listing Diagnosis Keys
@@ -83,6 +83,18 @@ regarded as public; it doesn't contain PII.
 The endpoint supports byte range requests as defined in [RFC 7233](https://tools.ietf.org/html/rfc7233).
 The `HEAD` method may be used to obtain `Last-Modified` and `Content-Length` headers
 for cache control purposes.
+
+A query parameter (`since`) allows clients to reduce the HTTP response size, by
+only querying for Diagnosis Keys that were uploaded since a given date, with a
+granularity of one day. Because of this granularity, when using this parameter for
+a daily request, clients should always query with a `since` value one day in the
+past (UTC), to ensure no data is missed for the current/ongoing day.
+
+#### Query parameters
+
+| Name    | Description                                                                                                                                         |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `since` | Used for listing diagnosis keys uploaded since a given date, with a granularity of one day. Format: `yyyy-mm-dd`. Example: `2020-05-03`. (Optional) |
 
 #### Response
 

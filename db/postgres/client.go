@@ -83,7 +83,8 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
 	var diagKeys []diag.DiagnosisKey
 
-	rows, err := c.db.QueryContext(ctx, "SELECT key, interval_number FROM diagnosis_keys")
+	query := `SELECT key, interval_number, created_at FROM diagnosis_keys ORDER BY created_at ASC`
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: could not execute query: %v", err)
 	}
@@ -92,7 +93,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	for rows.Next() {
 		var diagKey diag.DiagnosisKey
 		key := make([]byte, 0, 16)
-		if err := rows.Scan(&key, &diagKey.ENIntervalNumber); err != nil {
+		if err := rows.Scan(&key, &diagKey.ENIntervalNumber, &diagKey.UploadedAt); err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}
 		copy(diagKey.TemporaryExposureKey[:], key)

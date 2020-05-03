@@ -24,22 +24,42 @@ info:
   license:
     name: MIT
     url: https://github.com/dstotijn/ct-diag-server/blob/master/LICENSE
-  version: 0.4.0
+  version: 0.5.0
 externalDocs:
   url: https://github.com/dstotijn/ct-diag-server
 servers:
-  - url: https://ct-reference.codefor.nl/
-    description: Server hosted by [Code for NL](https://www.codefor.nl/).
+  - url: https://ct-diag-server.v0x.nl/
 paths:
   /diagnosis-keys:
     get:
       description: |
         To be used for fetching a list of Diagnosis Keys. A typical client is either a mobile device, or an intermediate platform/server of an app developer, for manual/custom distribution of the payload to clients. In either case, the keyset can be regarded as public; it doesn't contain PII.
 
+        The endpoint supports byte range requests as defined in [RFC 7233](https://tools.ietf.org/html/rfc7233).
+        The `HEAD` method may be used to obtain `Last-Modified` and `Content-Length` headers
+        for cache control purposes.
+
+        A `200 OK` response should be expected for normal requests (non-empty and empty),
+        and `206 Partial Content` for responses to byte range requests.
+        In case of an empty reply, a `Content-Length: 0` header is written.
+
+        A `500 Internal Server Error` response indicates server failure, and warrants a retry
+
         The HTTP response body is a bytestream of Diagnosis Keys. A diagnosis key consists
-        of two parts: the `TemporaryExposureKey` (16 bytes), and 2 bytes (big endian) to denote
-        its `ENIntervalNumber`; the 10 minute interval since Unix Epoch. Because the amount of bytes
-        per diagnosis key is fixed, there is no delimiter.
+        of two parts: the `TemporaryExposureKey` itself (16 bytes), and 4 bytes (big endian)
+        for the `ENIntervalNumber` of the key, referred to as the "startRollingNumber" in
+        the spec. Because the amount of bytes per Diagnosis Key is fixed, there is no delimiter.
+      parameters:
+        - name: string
+          in: query
+          description:
+            "Used for listing diagnosis keys uploaded since a given date,
+            with a granularity of one day. Format: `yyyy-mm-dd`. Example: `2020-05-03`."
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: string
       responses:
         "200":
           description: Successful response
@@ -47,12 +67,43 @@ paths:
             Content-Length:
               description:
                 Is `n * 20`, where `n` is the amount of found Diagnosis
-                Keys. E.g. "840" for 42 keys.
+                Keys.
               style: simple
               explode: false
               schema:
                 type: integer
-                example: 840
+                example: 18000
+            Last-Modified:
+              description: The last modified date of the cache.
+              style: simple
+              explode: false
+              schema:
+                type: string
+                example: Sun, 03 May 2020 13:13:14 GMT
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: Partial Content
+          headers:
+            Content-Length:
+              description:
+                Is `n * 20`, where `n` is the amount of found Diagnosis
+                Keys.
+              style: simple
+              explode: false
+              schema:
+                type: integer
+                example: 18000
+            Last-Modified:
+              description: The last modified date of the cache.
+              style: simple
+              explode: false
+              schema:
+                type: string
+                example: Sun, 03 May 2020 13:13:14 GMT
           content:
             application/octet-stream:
               schema:
@@ -68,11 +119,25 @@ paths:
     post:
       description: |-
         To be used for uploading a set of Diagnosis Keys by a mobile client device.
+        **Note:** It's still undecided if this server should authenticate requests. Given the
+        wide range of per-country use cases and processes, this is now delegated to the server
+        operator to shield this endpoint against unauthorized access, and provide its own
+        upstream proxy, e.g. tailored to handle auth-z for health personnel.
 
-        **Note:** There currently is no authentication, nor is there a means to obtain
-        and compute a bearer token. See [TODO](https://github.com/dstotijn/ct-diag-server#todo).
 
-        The HTTP request body should be a bytestream of `1 <= 14` Diagnosis Keys. A diagnosis key consists of two parts: the `TemporaryExposureKey` (16 bytes), and 2 bytes (big endian) to denote its `ENIntervalNumber`. Because the amount of bytes per diagnosis key is fixed, there is no delimiter.
+        The HTTP request body should be a bytestream of `1 <= n` Diagnosis Keys, where
+        `n` is the max upload batch size configured on the server (default: 14).
+        A diagnosis key consists of two parts: the `TemporaryExposureKey` itself (16 bytes),
+        and 2 bytes (big endian) to denote the `ENIntervalNumber` (see above). Because
+        the amount of bytes per diagnosis key is fixed, there is no delimiter.
+
+        A `200 OK` response with body `OK` should be expected on successful storage of the
+        keyset in the database.
+        A `400 Bad Request` response is used for client errors. A `500 Internal Server Error`
+        response is used for server errors, and warrants a retry. Error reasons are written
+        in a `text/plain; charset=utf-8` response body.
+
+        Duplicate keys are silently ignored.
       requestBody:
         content:
           application/octet-stream:
@@ -93,7 +158,7 @@ paths:
             text/plain; charset=utf-8:
               schema:
                 type: string
-                example: "Invalid body: unexpected EOF"
+                example: "Invalid Body: unexpected EOF"
         "500":
           description: Unexpected error
           content:

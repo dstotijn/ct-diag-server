@@ -31,14 +31,21 @@ var (
 	ErrMaxUploadExceeded = errors.New("diag: maximum upload batch size exceeded")
 )
 
-// DiagnosisKey is the combination of a `TemporaryExposureKey` and its related
-// `ENIntervalNumber`. In total, a DiagnosisKey takes up 20 bytes when sent over
-// the wire. Note: The `ENIntervalNumber` is the 10 minute time window since Unix
-// Epoch when the key `TemporaryExposureKey` was generated.
-// @see https://covid19-static.cdn-apple.com/applications/covid19/current/static/contact-tracing/pdf/ExposureNotification-CryptographySpecificationv1.1.pdf
+// DiagnosisKey is the combination of a TemporaryExposureKey and its related
+// ENIntervalNumber.
+// @see https://covid19-static.cdn-apple.com/applications/covid19/current/static/contact-tracing/pdf/ExposureNotification-CryptographySpecificationv1.2.pdf
 type DiagnosisKey struct {
+	// TemporaryExposureKey is the key itself.
 	TemporaryExposureKey [16]byte
-	ENIntervalNumber     uint32
+
+	// ENIntervalNumber is the 10 minute time window since Unix
+	// Epoch when the key TemporaryExposureKey was generated.
+	ENIntervalNumber uint32
+
+	// UploadedAt represents the time when the TemporaryExposureKey was uploaded
+	// to the server. It is used for querying a subset of keys, and is *not*
+	// part of bytestreams from/to the client.
+	UploadedAt time.Time
 }
 
 // Repository defines an interface for storing and retrieving diagnosis keys
@@ -91,7 +98,11 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 	if err := svc.hydrateCache(ctx); err != nil {
 		return Service{}, fmt.Errorf("diag: could not hydrate cache: %v", err)
 	}
-	svc.logger.Info("Cache hydrated.", zap.Int("size", svc.cache.Size()))
+	n, err := svc.cache.ReadSeeker(time.Time{}).Seek(0, io.SeekEnd)
+	if err != nil {
+		return Service{}, fmt.Errorf("diag: could not seek cache: %v", err)
+	}
+	svc.logger.Info("Cache hydrated.", zap.Int64("size", n))
 
 	// Run cache refresh worker in separate goroutine.
 	go func() {
@@ -157,18 +168,15 @@ func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 }
 
 // ReadSeeker returns an io.ReadSeeker for accessing the cache.
-func (s Service) ReadSeeker() io.ReadSeeker {
-	return s.cache.ReadSeeker()
+// When a non zero `since` value is passed, Diagnosis Keys from that timestamp
+// (truncated by day) onwards will be returned. Else, all contents are used.
+func (s Service) ReadSeeker(since time.Time) io.ReadSeeker {
+	return s.cache.ReadSeeker(since)
 }
 
 // LastModified returns the timestamp of the latest Diagnosis Key upload.
 func (s Service) LastModified() time.Time {
 	return s.cache.LastModified().UTC()
-}
-
-// ItemCount returns the amount of known diagnosis keys.
-func (s Service) ItemCount() int {
-	return s.cache.Size() / DiagnosisKeySize
 }
 
 // MaxUploadBatchSize returns the maximum number of diagnosis keys to be uploaded
@@ -177,7 +185,7 @@ func (s Service) MaxUploadBatchSize() uint {
 	return s.maxUploadBatchSize
 }
 
-func writeDiagnosisKeys(w io.Writer, diagKeys []DiagnosisKey) error {
+func writeDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
 	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
 	// (uint32, big endian). Because both parts have a fixed length, there is no
@@ -228,8 +236,15 @@ func (s Service) refreshCache(ctx context.Context) error {
 		case <-t.C:
 			if err := s.hydrateCache(ctx); err != nil {
 				s.logger.Error("Could not refresh cache", zap.Error(err))
+				continue
 			}
-			s.logger.Info("Cache refreshed.", zap.Int("size", s.cache.Size()))
+			n, err := s.cache.ReadSeeker(time.Time{}).Seek(0, io.SeekEnd)
+			if err != nil {
+				s.logger.Error("Could not seek cache", zap.Error(err))
+				continue
+			}
+
+			s.logger.Info("Cache refreshed.", zap.Int64("size", n))
 		}
 	}
 }

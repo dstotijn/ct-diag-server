@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/dstotijn/ct-diag-server/diag"
 
@@ -57,7 +58,19 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	rs := h.diagSvc.ReadSeeker()
+	var since time.Time
+	sinceParam := r.URL.Query().Get("since")
+	if sinceParam != "" {
+		var err error
+		since, err = time.Parse("2006-01-02", sinceParam)
+		if err != nil {
+			msg := fmt.Sprintf("Invalid `since` query parameter (%v), must be formatted as \"yyyy-mm-dd\".", sinceParam)
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
+	}
+
+	rs := h.diagSvc.ReadSeeker(since)
 	lastModified := h.diagSvc.LastModified()
 	http.ServeContent(w, r, "", lastModified, rs)
 }

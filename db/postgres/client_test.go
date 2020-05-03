@@ -143,6 +143,8 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	now := time.Now().UTC()
+
 	tests := []struct {
 		name        string
 		diagKeys    []diag.DiagnosisKey
@@ -161,12 +163,14 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 				{
 					TemporaryExposureKey: key,
 					ENIntervalNumber:     uint32(42),
+					UploadedAt:           now,
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
 					TemporaryExposureKey: key,
 					ENIntervalNumber:     uint32(42),
+					UploadedAt:           now,
 				},
 			},
 			expError: nil,
@@ -187,10 +191,8 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			}
 			defer stmt.Close()
 
-			createdAt := time.Now()
-
 			for _, diagKey := range tt.diagKeys {
-				_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber, createdAt)
+				_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber, diagKey.UploadedAt)
 				if err != nil {
 					t.Fatal(err)
 				}
