@@ -209,7 +209,7 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(diagKeys, tt.expDiagKeys) {
-				t.Errorf("expected: %#v, got: %#v", tt.expDiagKeys, diagKeys)
+				t.Errorf("expected: %+v, got: %+v", tt.expDiagKeys, diagKeys)
 			}
 		})
 	}
