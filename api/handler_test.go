@@ -176,44 +176,31 @@ func TestListDiagnosisKeys(t *testing.T) {
 
 	t.Run("with `since` query parameter", func(t *testing.T) {
 		tests := []struct {
-			name        string
-			diagKeys    []diag.DiagnosisKey
-			expDiagKeys []diag.DiagnosisKey
-			since       string
+			name          string
+			diagKeys      []diag.DiagnosisKey
+			since         string
+			expStatusCode int
+			expBody       string
+			expDiagKeys   []diag.DiagnosisKey
 		}{
 			{
-				name:        "no diagnosis keys in database",
-				diagKeys:    nil,
-				expDiagKeys: nil,
+				name:          "invalid query parameter",
+				diagKeys:      nil,
+				since:         "foobar",
+				expStatusCode: 400,
+				expDiagKeys:   nil,
+				expBody:       "Invalid `since` query parameter (foobar), must be formatted as \"yyyy-mm-dd\".",
 			},
 			{
-				name: "since date on oldest created_at day in database",
-				diagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
-					},
-					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
-					},
-				},
-				expDiagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-					},
-					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-					},
-				},
+				name:          "no diagnosis keys in database",
+				diagKeys:      nil,
+				since:         "2020-05-03",
+				expStatusCode: 200,
+				expDiagKeys:   nil,
+			},
+			{
+				name:  "since date on oldest created_at day in database",
 				since: "2020-05-02",
-			},
-			{
-				name: "since date on latest created_at day in database",
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -226,16 +213,21 @@ func TestListDiagnosisKeys(t *testing.T) {
 						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 				},
+				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
+					{
+						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						ENIntervalNumber:     uint32(42),
+					},
 					{
 						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 						ENIntervalNumber:     uint32(42),
 					},
 				},
+			},
+			{
+				name:  "since date on latest created_at day in database",
 				since: "2020-05-03",
-			},
-			{
-				name: "since date older than oldest created_at day in database",
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -248,20 +240,17 @@ func TestListDiagnosisKeys(t *testing.T) {
 						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 				},
+				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-					},
 					{
 						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 						ENIntervalNumber:     uint32(42),
 					},
 				},
+			},
+			{
+				name:  "since date older than oldest created_at day in database",
 				since: "2020-05-01",
-			},
-			{
-				name: "since date later than newest created_at day in database",
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -274,11 +263,39 @@ func TestListDiagnosisKeys(t *testing.T) {
 						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 				},
-				expDiagKeys: nil,
-				since:       "2020-05-04",
+				expStatusCode: 200,
+				expDiagKeys: []diag.DiagnosisKey{
+					{
+						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						ENIntervalNumber:     uint32(42),
+					},
+					{
+						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						ENIntervalNumber:     uint32(42),
+					},
+				},
 			},
 			{
-				name: "since date between oldest and newest created_at day in database",
+				name:  "since date later than newest created_at day in database",
+				since: "2020-05-04",
+				diagKeys: []diag.DiagnosisKey{
+					{
+						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						ENIntervalNumber:     uint32(42),
+						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+					},
+					{
+						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						ENIntervalNumber:     uint32(42),
+						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+					},
+				},
+				expStatusCode: 200,
+				expDiagKeys:   nil,
+			},
+			{
+				name:  "since date between oldest and newest created_at day in database",
+				since: "2020-05-03",
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -296,6 +313,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 						UploadedAt:           time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
 					},
 				},
+				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
@@ -306,10 +324,10 @@ func TestListDiagnosisKeys(t *testing.T) {
 						ENIntervalNumber:     uint32(42),
 					},
 				},
-				since: "2020-05-03",
 			},
 			{
-				name: "since date between oldest and newest, but in between day offsets",
+				name:  "since date between oldest and newest, but in between day offsets",
+				since: "2020-05-03",
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -322,13 +340,13 @@ func TestListDiagnosisKeys(t *testing.T) {
 						UploadedAt:           time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
 					},
 				},
+				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 						ENIntervalNumber:     uint32(42),
 					},
 				},
-				since: "2020-05-03",
 			},
 		}
 
@@ -353,13 +371,18 @@ func TestListDiagnosisKeys(t *testing.T) {
 				handler.ServeHTTP(w, req)
 				resp := w.Result()
 
-				expStatusCode := 200
-				if got := resp.StatusCode; got != expStatusCode {
+				if got := resp.StatusCode; got != tt.expStatusCode {
+					t.Errorf("expected: %v, got: %v", tt.expStatusCode, got)
+				}
+
+				if tt.expBody != "" {
 					body, err := ioutil.ReadAll(resp.Body)
 					if err != nil {
 						t.Fatal(err)
 					}
-					t.Errorf("expected: %v, got: %v (body: %s)", expStatusCode, got, strings.TrimSpace(string(body)))
+					if got := strings.TrimSpace(string(body)); got != tt.expBody {
+						t.Fatalf("expected: %v, got: `%s`", tt.expBody, got)
+					}
 				}
 
 				var got []diag.DiagnosisKey
