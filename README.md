@@ -156,8 +156,6 @@ in a `text/plain; charset=utf-8` response body.
 
 ## TODO
 
-- [ ] Add `since` query parameter to `listDiagnosisKeys` endpoint to allow
-      offsetting the Diagnosis Key list by upload date to minimize data sent over the wire.
 - [ ] Write benchmarks.
 - [ ] Add FAQ and/or guide for server operators.
 
