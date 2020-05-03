@@ -143,7 +143,7 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	now := time.Now().UTC()
+	now := time.Unix(42, 0).UTC()
 
 	tests := []struct {
 		name        string
