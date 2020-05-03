@@ -97,6 +97,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}
 		copy(diagKey.TemporaryExposureKey[:], key)
+		diagKey.UploadedAt = diagKey.UploadedAt.In(time.UTC)
 		diagKeys = append(diagKeys, diagKey)
 	}
 	rows.Close()
