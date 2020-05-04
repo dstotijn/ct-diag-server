@@ -40,6 +40,7 @@ func TestMain(m *testing.M) {
 func TestStoreDiagnosisKeys(t *testing.T) {
 	ctx := context.Background()
 	key := [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	uploadedAt := time.Now().UTC()
 
 	tests := []struct {
 		name        string
@@ -56,14 +57,18 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			name: "valid diagnosis keyset",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					TemporaryExposureKey: key,
-					ENIntervalNumber:     uint32(42),
+					TemporaryExposureKey:  key,
+					RollingStartNumber:    uint32(42),
+					TransmissionRiskLevel: 50,
+					UploadedAt:            uploadedAt,
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					TemporaryExposureKey: key,
-					ENIntervalNumber:     uint32(42),
+					TemporaryExposureKey:  key,
+					RollingStartNumber:    uint32(42),
+					TransmissionRiskLevel: 50,
+					UploadedAt:            uploadedAt,
 				},
 			},
 			expError: nil,
@@ -72,18 +77,24 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			name: "duplicate diagnosis keyset",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					TemporaryExposureKey: key,
-					ENIntervalNumber:     uint32(42),
+					TemporaryExposureKey:  key,
+					RollingStartNumber:    uint32(42),
+					TransmissionRiskLevel: 50,
+					UploadedAt:            uploadedAt,
 				},
 				{
-					TemporaryExposureKey: key,
-					ENIntervalNumber:     uint32(42),
+					TemporaryExposureKey:  key,
+					RollingStartNumber:    uint32(42),
+					TransmissionRiskLevel: 50,
+					UploadedAt:            uploadedAt,
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					TemporaryExposureKey: key,
-					ENIntervalNumber:     uint32(42),
+					TemporaryExposureKey:  key,
+					RollingStartNumber:    uint32(42),
+					TransmissionRiskLevel: 50,
+					UploadedAt:            uploadedAt,
 				},
 			},
 			expError: nil,
@@ -97,14 +108,14 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := client.StoreDiagnosisKeys(ctx, tt.diagKeys, time.Now())
+			err := client.StoreDiagnosisKeys(ctx, tt.diagKeys, uploadedAt)
 			if err != tt.expError {
 				t.Fatalf("expected: %v, got: %v", tt.expError, err)
 			}
 
 			var diagKeys []diag.DiagnosisKey
 
-			rows, err := client.db.QueryContext(ctx, "SELECT key, interval_number FROM diagnosis_keys")
+			rows, err := client.db.QueryContext(ctx, "SELECT temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at FROM diagnosis_keys")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -113,7 +124,12 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 			for rows.Next() {
 				var diagKey diag.DiagnosisKey
 				key := make([]byte, 0, 16)
-				err := rows.Scan(&key, &diagKey.ENIntervalNumber)
+				err := rows.Scan(
+					&key,
+					&diagKey.RollingStartNumber,
+					&diagKey.TransmissionRiskLevel,
+					&diagKey.UploadedAt,
+				)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -162,14 +178,14 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			diagKeys: []diag.DiagnosisKey{
 				{
 					TemporaryExposureKey: key,
-					ENIntervalNumber:     uint32(42),
+					RollingStartNumber:   uint32(42),
 					UploadedAt:           now,
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
 					TemporaryExposureKey: key,
-					ENIntervalNumber:     uint32(42),
+					RollingStartNumber:   uint32(42),
 					UploadedAt:           now,
 				},
 			},
@@ -185,14 +201,19 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)")
+			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4)")
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer stmt.Close()
 
 			for _, diagKey := range tt.diagKeys {
-				_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber, diagKey.UploadedAt)
+				_, err = stmt.ExecContext(ctx,
+					diagKey.TemporaryExposureKey[:],
+					diagKey.RollingStartNumber,
+					diagKey.TransmissionRiskLevel,
+					diagKey.UploadedAt,
+				)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -252,15 +273,17 @@ func TestLastModified(t *testing.T) {
 			storeReq: []storeReq{
 				{
 					diagKey: diag.DiagnosisKey{
-						TemporaryExposureKey: randomTEK(),
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  randomTEK(),
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 					lastModified: time.Unix(42, 0),
 				},
 				{
 					diagKey: diag.DiagnosisKey{
-						TemporaryExposureKey: randomTEK(),
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  randomTEK(),
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 					lastModified: time.Unix(43, 0),
 				},
@@ -278,14 +301,19 @@ func TestLastModified(t *testing.T) {
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)")
+			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4)")
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer stmt.Close()
 
 			for _, storeReq := range tt.storeReq {
-				_, err = stmt.ExecContext(ctx, storeReq.diagKey.TemporaryExposureKey[:], storeReq.diagKey.ENIntervalNumber, storeReq.lastModified)
+				_, err = stmt.ExecContext(ctx,
+					storeReq.diagKey.TemporaryExposureKey[:],
+					storeReq.diagKey.RollingStartNumber,
+					storeReq.diagKey.TransmissionRiskLevel,
+					storeReq.lastModified,
+				)
 				if err != nil {
 					t.Fatal(err)
 				}

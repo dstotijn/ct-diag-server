@@ -15,13 +15,12 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	// DiagnosisKeySize is the size of a `Diagnosis Key`, consisting of a
-	// `TemporaryExposureKey` (16 bytes) and a `ENIntervalNumber` (4 bytes).
-	DiagnosisKeySize = 20
+// DiagnosisKeySize represents the size of a Diagnosis Key when transmitted
+// over a network in bytes (16 bytes for the TemporaryExposure Key, 4 bytes
+// for the RollingStartNumber, and 1 byte for the TransmissionRiskLevel).
+const DiagnosisKeySize = 21
 
-	defaultMaxUploadBatchSize = 14
-)
+const defaultMaxUploadBatchSize = 14
 
 var (
 	// ErrNilDiagKeys is used when an empty diagnosis keyset is encountered.
@@ -31,21 +30,14 @@ var (
 	ErrMaxUploadExceeded = errors.New("diag: maximum upload batch size exceeded")
 )
 
-// DiagnosisKey is the combination of a TemporaryExposureKey and its related
-// ENIntervalNumber.
-// @see https://covid19-static.cdn-apple.com/applications/covid19/current/static/contact-tracing/pdf/ExposureNotification-CryptographySpecificationv1.2.pdf
+// DiagnosisKey is a TemporaryExposure key with its related rollingStartNumber,
+// and the timestamp of its submission to the server.
+// @see https://developer.apple.com/documentation/exposurenotification/entemporaryexposurekey
 type DiagnosisKey struct {
-	// TemporaryExposureKey is the key itself.
-	TemporaryExposureKey [16]byte
-
-	// ENIntervalNumber is the 10 minute time window since Unix
-	// Epoch when the key TemporaryExposureKey was generated.
-	ENIntervalNumber uint32
-
-	// UploadedAt represents the time when the TemporaryExposureKey was uploaded
-	// to the server. It is used for querying a subset of keys, and is *not*
-	// part of bytestreams from/to the client.
-	UploadedAt time.Time
+	TemporaryExposureKey  [16]byte
+	RollingStartNumber    uint32
+	TransmissionRiskLevel byte
+	UploadedAt            time.Time
 }
 
 // Repository defines an interface for storing and retrieving diagnosis keys
@@ -151,9 +143,14 @@ func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 		start := i * DiagnosisKeySize
 		var key [16]byte
 		copy(key[:], buf[start:start+16])
-		enin := binary.BigEndian.Uint32(buf[start+16 : start+DiagnosisKeySize])
+		rollingStartNumber := binary.BigEndian.Uint32(buf[start+16 : start+DiagnosisKeySize])
+		transRiskLevel := buf[start+20]
 
-		diagKeys[i] = DiagnosisKey{TemporaryExposureKey: key, ENIntervalNumber: enin}
+		diagKeys[i] = DiagnosisKey{
+			TemporaryExposureKey:  key,
+			RollingStartNumber:    rollingStartNumber,
+			TransmissionRiskLevel: transRiskLevel,
+		}
 	}
 
 	return diagKeys, nil
@@ -179,7 +176,7 @@ func (s Service) MaxUploadBatchSize() uint {
 
 func writeDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
-	// written with the diagnosis key itself, and 4 bytes for `ENIntervalNumber`
+	// written with the diagnosis key itself, and 4 bytes for `RollingStartNumber`
 	// (uint32, big endian). Because both parts have a fixed length, there is no
 	// delimiter.
 	for i := range diagKeys {
@@ -187,9 +184,13 @@ func writeDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
 		if err != nil {
 			return err
 		}
-		enin := make([]byte, 4)
-		binary.BigEndian.PutUint32(enin, diagKeys[i].ENIntervalNumber)
-		_, err = w.Write(enin)
+		rollingStartNumber := make([]byte, 4)
+		binary.BigEndian.PutUint32(rollingStartNumber, diagKeys[i].RollingStartNumber)
+		_, err = w.Write(rollingStartNumber)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write([]byte{byte(diagKeys[i].TransmissionRiskLevel)})
 		if err != nil {
 			return err
 		}

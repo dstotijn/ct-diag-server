@@ -66,13 +66,13 @@ paths:
           headers:
             Content-Length:
               description:
-                Is `n * 20`, where `n` is the amount of found Diagnosis
+                Is `n * 21`, where `n` is the amount of found Diagnosis
                 Keys.
               style: simple
               explode: false
               schema:
                 type: integer
-                example: 18000
+                example: 42000
             Last-Modified:
               description: The last modified date of the cache.
               style: simple
@@ -90,13 +90,13 @@ paths:
           headers:
             Content-Length:
               description:
-                Is `n * 20`, where `n` is the amount of found Diagnosis
+                Is `n * 21`, where `n` is the amount of found Diagnosis
                 Keys.
               style: simple
               explode: false
               schema:
                 type: integer
-                example: 18000
+                example: 42000
             Last-Modified:
               description: The last modified date of the cache.
               style: simple

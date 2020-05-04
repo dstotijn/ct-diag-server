@@ -21,8 +21,14 @@ for offline key matching.
 ℹ️ The terminology and usage corresponds with v1.2 of the specification, as found
 [here](https://www.apple.com/covid19/contacttracing/) and [here](https://www.blog.google/inside-google/company-announcements/apple-and-google-partner-covid-19-contact-tracing-technology/).
 
-👉 Are you an app developer or working for a government and/or health care organization
-looking to implement/use this server? Please [contact me](mailto:dstotijn@gmail.com) if you have questions,
+⚠️ Apple/Google released [sample code](https://developer.apple.com/documentation/exposurenotification/building_an_app_to_notify_users_of_covid-19_exposure) on May 4,
+which clarifies some terminology and states best practices for apps and server
+implementations. Check out the [issue tracker](https://github.com/dstotijn/ct-diag-server/issues)
+for an up to date overview of the ongoing work as this project is being updated
+accordingly.
+
+👉 Are you an app developer or working for a government and/or health authority
+looking to implement this server? Please [contact me](mailto:dstotijn@gmail.com) if you have questions,
 or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
 
 ## Table of contents
@@ -56,8 +62,8 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
 
 - HTTP server for storing and retrieving Diagnosis Keys. Uses
   bytestreams for sending and receiving as little data as possible over the
-  wire: 20 bytes per _Diagnosis Key_ (16 bytes for the `TemporaryExposureKey`,
-  4 bytes for the `ENIntervalNumber`).
+  wire: 21 bytes per _Diagnosis Key_ (16 bytes for the `TemporaryExposureKey`,
+  4 bytes for the `RollingStartNumber` and 1 byte for the `TransmissionRiskLevel`).
 - PostgreSQL support for storage.
 - Caching interface, with in-memory implementation.
 
@@ -109,15 +115,14 @@ A `500 Internal Server Error` response indicates server failure, and warrants a 
 | Name                                             | Description                                                                                                                       |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | `Content-Type: application/octet-stream`         | The HTTP response is a bytestream of Diagnosis Keys (see below).                                                                  |
-| `Content-Length: {n * 20}`                       | Content length is `n * 20`, where `n` is the amount of returned Diagnosis Keys (byte range requests may yield different lengths). |
+| `Content-Length: {n * 21}`                       | Content length is `n * 21`, where `n` is the amount of returned Diagnosis Keys (byte range requests may yield different lengths). |
 | `Cache-Control: public, max-age=0, s-maxage=600` | For (upstream) caching purposes, this header may be used.                                                                         |
 
 #### Response body
 
-The HTTP response body is a bytestream of Diagnosis Keys. A diagnosis key consists
-of two parts: the `TemporaryExposureKey` itself (16 bytes), and 4 bytes (big endian)
-for the `ENIntervalNumber` of the key, referred to as the "startRollingNumber" in
-the spec. Because the amount of bytes per Diagnosis Key is fixed, there is no delimiter.
+The HTTP response body is a bytestream of Diagnosis Keys. A Diagnosis Key is 21
+bytes and consists of three parts: the `TemporaryExposureKey` itself (16 bytes), the `RollingStartNumber` (4 bytes, big endian) and the `TransmissionRiskLevel` (1 byte).
+Because the amount of bytes per Diagnosis Key is fixed, there is no delimiter.
 
 ### Uploading Diagnosis Keys
 
@@ -137,9 +142,9 @@ Any request headers (e.g. `Content-Length` and `Content-Type`) are not needed.
 
 The HTTP request body should be a bytestream of `1 <= n` Diagnosis Keys, where
 `n` is the max upload batch size configured on the server (default: 14).
-A diagnosis key consists of two parts: the `TemporaryExposureKey` itself (16 bytes),
-and 2 bytes (big endian) to denote the `ENIntervalNumber` (see above). Because
-the amount of bytes per diagnosis key is fixed, there is no delimiter.
+A diagnosis key consists of three parts: the `TemporaryExposureKey` itself (16 bytes),
+the `RollingStartNumber` (4 bytes, big endian) and the `TransmissionRiskLevel` (1 byte).
+Because the amount of bytes per Diagnosis Key is fixed, there is no delimiter.
 
 An unexpected end of the bytestream (e.g. incomplete key) results
 in a `400 Bad Request` response.
@@ -155,9 +160,6 @@ response is used for server errors, and warrants a retry. Error reasons are writ
 in a `text/plain; charset=utf-8` response body.
 
 ## TODO
-
-- [ ] Write benchmarks.
-- [ ] Add FAQ and/or guide for server operators.
 
 👉 See [issue tracker](https://github.com/dstotijn/ct-diag-server/issues).
 

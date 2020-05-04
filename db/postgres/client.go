@@ -43,13 +43,13 @@ func (c *Client) Close() error {
 }
 
 // StoreDiagnosisKeys persists an array of diagnosis keys in the database.
-func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.DiagnosisKey, createdAt time.Time) error {
+func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.DiagnosisKey, uploadedAt time.Time) error {
 	if len(diagKeys) == 0 {
 		return diag.ErrNilDiagKeys
 	}
 
-	if createdAt.IsZero() {
-		return errors.New("postgres: createdAt cannot be empty")
+	if uploadedAt.IsZero() {
+		return errors.New("postgres: uploadedAt cannot be zero")
 	}
 
 	tx, err := c.db.BeginTx(ctx, nil)
@@ -58,7 +58,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (key, interval_number, created_at) VALUES ($1, $2, $3)
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4)
 	ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING`)
 	if err != nil {
 		return fmt.Errorf("postgres: could not prepare statement: %v", err)
@@ -66,7 +66,12 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	defer stmt.Close()
 
 	for _, diagKey := range diagKeys {
-		_, err = stmt.ExecContext(ctx, diagKey.TemporaryExposureKey[:], diagKey.ENIntervalNumber, createdAt)
+		_, err = stmt.ExecContext(ctx,
+			diagKey.TemporaryExposureKey[:],
+			diagKey.RollingStartNumber,
+			diagKey.TransmissionRiskLevel,
+			uploadedAt,
+		)
 		if err != nil {
 			return fmt.Errorf("postgres: could not execute statement: %v", err)
 		}
@@ -83,7 +88,10 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
 	var diagKeys []diag.DiagnosisKey
 
-	query := `SELECT key, interval_number, created_at FROM diagnosis_keys ORDER BY created_at ASC`
+	query := `SELECT temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at
+	FROM diagnosis_keys
+	ORDER BY index ASC`
+
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: could not execute query: %v", err)
@@ -93,7 +101,13 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	for rows.Next() {
 		var diagKey diag.DiagnosisKey
 		key := make([]byte, 0, 16)
-		if err := rows.Scan(&key, &diagKey.ENIntervalNumber, &diagKey.UploadedAt); err != nil {
+		err := rows.Scan(
+			&key,
+			&diagKey.RollingStartNumber,
+			&diagKey.TransmissionRiskLevel,
+			&diagKey.UploadedAt,
+		)
+		if err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}
 		copy(diagKey.TemporaryExposureKey[:], key)
@@ -112,7 +126,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 // LastModified returns the timestamp of the latest uploaded Diagnosis Key.
 func (c *Client) LastModified(ctx context.Context) (time.Time, error) {
 	var lastModified time.Time
-	query := `SELECT created_at FROM diagnosis_keys ORDER BY created_at DESC LIMIT 1`
+	query := `SELECT uploaded_at FROM diagnosis_keys ORDER BY index DESC LIMIT 1`
 
 	err := c.db.QueryRowContext(ctx, query).Scan(&lastModified)
 	if err == sql.ErrNoRows {

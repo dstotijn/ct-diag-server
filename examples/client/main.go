@@ -80,7 +80,11 @@ func postDiagnosisKeys(baseURL string, batchSize int) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = binary.Write(buf, binary.BigEndian, diagKey.ENIntervalNumber)
+		err = binary.Write(buf, binary.BigEndian, diagKey.RollingStartNumber)
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, err = buf.Write([]byte{diagKey.TransmissionRiskLevel})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -112,9 +116,9 @@ func postDiagnosisKeys(baseURL string, batchSize int) {
 
 func diagnosisKeys(n int) (keys []diag.DiagnosisKey) {
 	for i := 0; i < n; i++ {
-		// startRollingNumber is the ENIntervalNumber that denotes the start
+		// rollingStartNumber is the RollingStartNumber that denotes the start
 		// validity time of a TemporaryExposureKey.
-		startRollingNumber := time.Now().AddDate(0, 0, -(i+1)).Unix() / (60 * 10) / 144 * 144
+		rollingStartNumber := time.Now().Add(time.Duration(-i+1)*24*time.Hour).Unix() / (60 * 10) / 144 * 144
 		buf := make([]byte, 16)
 		_, err := rand.Read(buf)
 		if err != nil {
@@ -123,8 +127,9 @@ func diagnosisKeys(n int) (keys []diag.DiagnosisKey) {
 		var key [16]byte
 		copy(key[:], buf)
 		keys = append(keys, diag.DiagnosisKey{
-			TemporaryExposureKey: key,
-			ENIntervalNumber:     uint32(startRollingNumber),
+			TemporaryExposureKey:  key,
+			RollingStartNumber:    uint32(rollingStartNumber),
+			TransmissionRiskLevel: 50,
 		})
 	}
 	return

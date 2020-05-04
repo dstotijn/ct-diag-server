@@ -110,8 +110,9 @@ func TestListDiagnosisKeys(t *testing.T) {
 	t.Run("diagnosis keys found", func(t *testing.T) {
 		expDiagKeys := []diag.DiagnosisKey{
 			{
-				TemporaryExposureKey: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-				ENIntervalNumber:     uint32(42),
+				TemporaryExposureKey:  [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+				RollingStartNumber:    uint32(42),
+				TransmissionRiskLevel: 50,
 			},
 		}
 		expLastModified := time.Date(2020, time.May, 2, 23, 30, 0, 0, time.UTC)
@@ -136,7 +137,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expContentLength := strconv.Itoa(len(expDiagKeys) * 20)
+		expContentLength := strconv.Itoa(len(expDiagKeys) * diag.DiagnosisKeySize)
 		if got := resp.Header.Get("Content-Length"); got != expContentLength {
 			t.Fatalf("expected: %v, got: %v", expContentLength, got)
 		}
@@ -157,16 +158,23 @@ func TestListDiagnosisKeys(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var enin uint32
-			err = binary.Read(resp.Body, binary.BigEndian, &enin)
-			if err == io.EOF {
-				t.Fatal(err)
-			}
+			var rollingStartNumber uint32
+			err = binary.Read(resp.Body, binary.BigEndian, &rollingStartNumber)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			got = append(got, diag.DiagnosisKey{TemporaryExposureKey: key, ENIntervalNumber: enin})
+			buf := make([]byte, 1)
+			_, err = resp.Body.Read(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got = append(got, diag.DiagnosisKey{
+				TemporaryExposureKey:  key,
+				RollingStartNumber:    rollingStartNumber,
+				TransmissionRiskLevel: buf[0],
+			})
 		}
 
 		if !reflect.DeepEqual(got, expDiagKeys) {
@@ -203,25 +211,29 @@ func TestListDiagnosisKeys(t *testing.T) {
 				since: "2020-05-02",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 				},
 			},
@@ -230,21 +242,24 @@ func TestListDiagnosisKeys(t *testing.T) {
 				since: "2020-05-03",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 				},
 			},
@@ -253,25 +268,29 @@ func TestListDiagnosisKeys(t *testing.T) {
 				since: "2020-05-01",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 				},
 			},
@@ -280,14 +299,16 @@ func TestListDiagnosisKeys(t *testing.T) {
 				since: "2020-05-04",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 				},
 				expStatusCode: 200,
@@ -298,30 +319,35 @@ func TestListDiagnosisKeys(t *testing.T) {
 				since: "2020-05-03",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
 					},
 					{
-						TemporaryExposureKey: [16]byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 					{
-						TemporaryExposureKey: [16]byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 				},
 			},
@@ -330,21 +356,24 @@ func TestListDiagnosisKeys(t *testing.T) {
 				since: "2020-05-03",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
 					},
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
-						UploadedAt:           time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
+						UploadedAt:            time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						ENIntervalNumber:     uint32(42),
+						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:    uint32(42),
+						TransmissionRiskLevel: 50,
 					},
 				},
 			},
@@ -397,16 +426,19 @@ func TestListDiagnosisKeys(t *testing.T) {
 						t.Fatal(err)
 					}
 
-					var enin uint32
-					err = binary.Read(resp.Body, binary.BigEndian, &enin)
-					if err == io.EOF {
-						t.Fatal(err)
-					}
+					var rollingStartNumber uint32
+					err = binary.Read(resp.Body, binary.BigEndian, &rollingStartNumber)
 					if err != nil {
 						t.Fatal(err)
 					}
+					buf := make([]byte, 1)
+					_, err = resp.Body.Read(buf)
 
-					got = append(got, diag.DiagnosisKey{TemporaryExposureKey: key, ENIntervalNumber: enin})
+					got = append(got, diag.DiagnosisKey{
+						TemporaryExposureKey:  key,
+						RollingStartNumber:    rollingStartNumber,
+						TransmissionRiskLevel: buf[0],
+					})
 				}
 
 				if !reflect.DeepEqual(got, tt.expDiagKeys) {
@@ -470,7 +502,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 	t.Run("too many diagnosis keys", func(t *testing.T) {
 		diagKey := diag.DiagnosisKey{
 			TemporaryExposureKey: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-			ENIntervalNumber:     uint32(42),
+			RollingStartNumber:   uint32(42),
 		}
 
 		cfg := &diag.Config{
@@ -485,7 +517,11 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
-			err = binary.Write(buf, binary.BigEndian, diagKey.ENIntervalNumber)
+			err = binary.Write(buf, binary.BigEndian, diagKey.RollingStartNumber)
+			if err != nil {
+				panic(err)
+			}
+			err = binary.Write(buf, binary.BigEndian, diagKey.TransmissionRiskLevel)
 			if err != nil {
 				panic(err)
 			}
@@ -517,7 +553,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 		expDiagKeys := []diag.DiagnosisKey{
 			{
 				TemporaryExposureKey: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-				ENIntervalNumber:     uint32(42),
+				RollingStartNumber:   uint32(42),
 			},
 		}
 
@@ -528,7 +564,11 @@ func TestPostDiagnosisKeys(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				err = binary.Write(buf, binary.BigEndian, expDiagKey.ENIntervalNumber)
+				err = binary.Write(buf, binary.BigEndian, expDiagKey.RollingStartNumber)
+				if err != nil {
+					panic(err)
+				}
+				err = binary.Write(buf, binary.BigEndian, expDiagKey.TransmissionRiskLevel)
 				if err != nil {
 					panic(err)
 				}
