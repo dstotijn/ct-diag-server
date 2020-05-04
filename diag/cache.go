@@ -12,8 +12,6 @@ import (
 type Cache interface {
 	// Set replaces the cache.
 	Set(diagKeys []DiagnosisKey, lastModified time.Time) error
-	// Add appends to the cache.
-	Add(diagKeys []DiagnosisKey, lastModified time.Time) error
 	// LastModified returns the timestamp of the latest uploaded Diagnosis Key.
 	LastModified() time.Time
 	// ReadSeeker returns a io.ReadSeeker for accessing the cache. When a non zero
@@ -52,34 +50,6 @@ func (mc *MemoryCache) Set(diagKeys []DiagnosisKey, lastModified time.Time) erro
 
 	mc.buf = buf.Bytes()
 	mc.dayOffsets = dayOffsets
-	mc.lastModified = lastModified
-
-	return nil
-}
-
-// Add appends items to the cache.
-// Assumes that `diagKeys` is indexed with Diagnosis Keys ordered
-// by upload timestamp, ascending.
-func (mc *MemoryCache) Add(diagKeys []DiagnosisKey, lastModified time.Time) error {
-	mc.mu.Lock()
-	defer mc.mu.Unlock()
-
-	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
-	for i := range diagKeys {
-		day := diagKeys[i].UploadedAt.Truncate(24 * time.Hour)
-		if _, found := mc.dayOffsets[day]; !found {
-			mc.dayOffsets[day] = len(mc.buf) + buf.Len()
-		}
-		if err := writeDiagnosisKeys(buf, diagKeys[i]); err != nil {
-			return err
-		}
-	}
-
-	if err := writeDiagnosisKeys(buf, diagKeys...); err != nil {
-		return err
-	}
-
-	mc.buf = append(mc.buf, buf.Bytes()...)
 	mc.lastModified = lastModified
 
 	return nil

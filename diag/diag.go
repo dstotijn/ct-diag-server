@@ -122,14 +122,6 @@ func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey
 		return err
 	}
 
-	go func() {
-		if err := s.cache.Add(diagKeys, now); err != nil {
-			s.logger.Error("Could not add to cache.", zap.Error(err))
-			return
-		}
-		s.logger.Info("Cached new diagnosis keys.", zap.Int("count", len(diagKeys)))
-	}()
-
 	return nil
 }
 
