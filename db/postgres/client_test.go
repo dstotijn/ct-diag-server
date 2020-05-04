@@ -134,6 +134,7 @@ func TestStoreDiagnosisKeys(t *testing.T) {
 					t.Fatal(err)
 				}
 				copy(diagKey.TemporaryExposureKey[:], key)
+				diagKey.UploadedAt = diagKey.UploadedAt.In(time.UTC)
 				diagKeys = append(diagKeys, diagKey)
 			}
 			rows.Close()
