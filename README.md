@@ -54,8 +54,6 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
 - Security: relies on Go's standard library where possible, and has minimal vendor
   dependencies.
 - Solid test coverage, for easy auditing and review.
-- Ships with PostgreSQL adapter for storage of Diagnosis Keys, but can easily be
-  forked for different adapters and/or caching services.
 - Permissive [license](LICENSE), easily forkable for other developers.
 
 ## Features
@@ -64,8 +62,11 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
   bytestreams for sending and receiving as little data as possible over the
   wire: 21 bytes per _Diagnosis Key_ (16 bytes for the `TemporaryExposureKey`,
   4 bytes for the `RollingStartNumber` and 1 byte for the `TransmissionRiskLevel`).
-- PostgreSQL support for storage.
+- Ships with PostgreSQL adapter for storage of Diagnosis Keys, but can easily be
+  forked for different adapters.
 - Caching interface, with in-memory implementation.
+- Cursor based offsetting for listing Diagnosis Keys, with support for byte ranges
+  and cache control headers.
 
 ---
 
