@@ -17,7 +17,6 @@ type Cache interface {
 	// value is given for `after`, implementors should use Diagnosis Keys
 	// uploaded after the given key, else all Diagnosis Keys should be used..
 	ReadSeeker(after [16]byte) io.ReadSeeker
-	Size() int
 }
 
 // MemoryCache represents an in-memory cache.
@@ -32,11 +31,6 @@ func (mc *MemoryCache) Set(buf []byte, lastModified time.Time) error {
 	mc.lastModified = lastModified
 
 	return nil
-}
-
-// Size returns the cache size.
-func (mc *MemoryCache) Size() int {
-	return len(mc.buf)
 }
 
 // LastModified returns the timestamp of the latest uploaded Diagnosis Key in the cache.
