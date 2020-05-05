@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"log"
@@ -187,7 +188,6 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 				{
 					TemporaryExposureKey: key,
 					RollingStartNumber:   uint32(42),
-					UploadedAt:           now,
 				},
 			},
 			expError: nil,
@@ -230,8 +230,14 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 				t.Fatalf("expected: %v, got: %v", tt.expError, err)
 			}
 
-			if !reflect.DeepEqual(diagKeys, tt.expDiagKeys) {
-				t.Errorf("expected: %+v, got: %+v", tt.expDiagKeys, diagKeys)
+			expDiagKeys := &bytes.Buffer{}
+			err = diag.WriteDiagnosisKeys(expDiagKeys, tt.expDiagKeys...)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !bytes.Equal(diagKeys, expDiagKeys.Bytes()) {
+				t.Errorf("expected: %+v, got: %+v", expDiagKeys.Bytes(), diagKeys)
 			}
 		})
 	}

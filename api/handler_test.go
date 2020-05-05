@@ -22,7 +22,7 @@ import (
 
 type testRepository struct {
 	storeDiagnosisKeysFn   func(context.Context, []diag.DiagnosisKey, time.Time) error
-	findAllDiagnosisKeysFn func(context.Context) ([]diag.DiagnosisKey, error)
+	findAllDiagnosisKeysFn func(context.Context) ([]byte, error)
 	lastModifiedFn         func(context.Context) (time.Time, error)
 }
 
@@ -30,7 +30,7 @@ func (ts testRepository) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag
 	return ts.storeDiagnosisKeysFn(ctx, diagKeys, createdAt)
 }
 
-func (ts testRepository) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
+func (ts testRepository) FindAllDiagnosisKeys(ctx context.Context) ([]byte, error) {
 	return ts.findAllDiagnosisKeysFn(ctx)
 }
 
@@ -40,7 +40,7 @@ func (ts testRepository) LastModified(ctx context.Context) (time.Time, error) {
 
 var noopRepo = testRepository{
 	storeDiagnosisKeysFn:   func(_ context.Context, _ []diag.DiagnosisKey, _ time.Time) error { return nil },
-	findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
+	findAllDiagnosisKeysFn: func(_ context.Context) ([]byte, error) { return nil, nil },
 	lastModifiedFn:         func(_ context.Context) (time.Time, error) { return time.Time{}, nil },
 }
 
@@ -118,8 +118,10 @@ func TestListDiagnosisKeys(t *testing.T) {
 		expLastModified := time.Date(2020, time.May, 2, 23, 30, 0, 0, time.UTC)
 		cfg := &diag.Config{
 			Repository: testRepository{
-				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
-					return expDiagKeys, nil
+				findAllDiagnosisKeysFn: func(_ context.Context) ([]byte, error) {
+					buf := &bytes.Buffer{}
+					diag.WriteDiagnosisKeys(buf, expDiagKeys...)
+					return buf.Bytes(), nil
 				},
 				lastModifiedFn: func(_ context.Context) (time.Time, error) { return expLastModified, nil },
 			},
@@ -255,8 +257,10 @@ func TestListDiagnosisKeys(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				cfg := &diag.Config{
 					Repository: testRepository{
-						findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
-							return tt.diagKeys, nil
+						findAllDiagnosisKeysFn: func(_ context.Context) ([]byte, error) {
+							buf := &bytes.Buffer{}
+							diag.WriteDiagnosisKeys(buf, tt.diagKeys...)
+							return buf.Bytes(), nil
 						},
 						lastModifiedFn: noopRepo.lastModifiedFn,
 					},

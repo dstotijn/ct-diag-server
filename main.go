@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/dstotijn/ct-diag-server/api"
 	"github.com/dstotijn/ct-diag-server/db/postgres"
@@ -21,10 +22,12 @@ func main() {
 		addr               string
 		maxUploadBatchSize uint
 		isDev              bool
+		cacheInterval      time.Duration
 	)
 	flag.StringVar(&addr, "addr", ":80", "HTTP listen address")
 	flag.UintVar(&maxUploadBatchSize, "maxUploadBatchSize", 14, "Maximum upload batch size")
 	flag.BoolVar(&isDev, "dev", false, "Boolean indicating whether the app is running in a dev environment")
+	flag.DurationVar(&cacheInterval, "cacheInterval", 5*time.Minute, "Interval between cache refresh")
 	flag.Parse()
 
 	logger, err := newLogger(isDev)
@@ -48,6 +51,7 @@ func main() {
 	cfg := diag.Config{
 		Repository:         db,
 		Cache:              &diag.MemoryCache{},
+		CacheInterval:      cacheInterval,
 		MaxUploadBatchSize: maxUploadBatchSize,
 		Logger:             logger,
 	}

@@ -3,7 +3,6 @@ package diag
 import (
 	"bytes"
 	"io"
-	"sync"
 	"time"
 )
 
@@ -11,36 +10,25 @@ import (
 // in between clients and the repository for listing keys.
 type Cache interface {
 	// Set replaces the cache.
-	Set(diagKeys []DiagnosisKey, lastModified time.Time) error
+	Set(buf []byte, lastModified time.Time) error
 	// LastModified returns the timestamp of the latest uploaded Diagnosis Key.
 	LastModified() time.Time
 	// ReadSeeker returns a io.ReadSeeker for accessing the cache. When a non zero
 	// value is given for `after`, implementors should use Diagnosis Keys
 	// uploaded after the given key, else all Diagnosis Keys should be used..
 	ReadSeeker(after [16]byte) io.ReadSeeker
+	Size() int
 }
 
 // MemoryCache represents an in-memory cache.
-// The mutex is used to prevent concurrent appending to the slice and mutating
-// the day offset map..
 type MemoryCache struct {
 	buf          []byte
 	lastModified time.Time
-	mu           sync.Mutex
 }
 
 // Set overwrites the cache.
-func (mc *MemoryCache) Set(diagKeys []DiagnosisKey, lastModified time.Time) error {
-	mc.mu.Lock()
-	defer mc.mu.Unlock()
-
-	buf := bytes.NewBuffer(make([]byte, 0, len(diagKeys)*DiagnosisKeySize))
-
-	if err := writeDiagnosisKeys(buf, diagKeys...); err != nil {
-		return err
-	}
-
-	mc.buf = buf.Bytes()
+func (mc *MemoryCache) Set(buf []byte, lastModified time.Time) error {
+	mc.buf = buf
 	mc.lastModified = lastModified
 
 	return nil

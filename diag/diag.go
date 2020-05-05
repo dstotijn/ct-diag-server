@@ -44,7 +44,7 @@ type DiagnosisKey struct {
 // in a repository.
 type Repository interface {
 	StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey, createdAt time.Time) error
-	FindAllDiagnosisKeys(ctx context.Context) ([]DiagnosisKey, error)
+	FindAllDiagnosisKeys(ctx context.Context) ([]byte, error)
 	LastModified(ctx context.Context) (time.Time, error)
 }
 
@@ -60,6 +60,7 @@ type Service struct {
 type Config struct {
 	Repository         Repository
 	Cache              Cache
+	CacheInterval      time.Duration
 	MaxUploadBatchSize uint
 	Logger             *zap.Logger
 }
@@ -81,6 +82,11 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 		svc.cache = &MemoryCache{}
 	}
 
+	// Set sane default for cache refresh interval.
+	if cfg.CacheInterval == 0 {
+		cfg.CacheInterval = 5 * time.Minute
+	}
+
 	// Set sane default for max upload batch size.
 	if svc.maxUploadBatchSize == 0 {
 		svc.maxUploadBatchSize = defaultMaxUploadBatchSize
@@ -98,7 +104,7 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 
 	// Run cache refresh worker in separate goroutine.
 	go func() {
-		if err := svc.refreshCache(ctx); err != nil && err != context.Canceled {
+		if err := svc.refreshCache(ctx, cfg.CacheInterval); err != nil && err != context.Canceled {
 			svc.logger.Error("Could not refresh cache.", zap.Error(err))
 		}
 	}()
@@ -115,11 +121,6 @@ func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey
 	}
 
 	return nil
-}
-
-// FindAllDiagnosisKeys fetches all diagnosis keys from the repository.
-func (s Service) FindAllDiagnosisKeys(ctx context.Context) ([]DiagnosisKey, error) {
-	return s.repo.FindAllDiagnosisKeys(ctx)
 }
 
 // ParseDiagnosisKeys reads and parses diagnosis keys from an io.Reader.
@@ -174,7 +175,7 @@ func (s Service) MaxUploadBatchSize() uint {
 	return s.maxUploadBatchSize
 }
 
-func writeDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
+func WriteDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
 	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
 	// written with the diagnosis key itself, and 4 bytes for `RollingStartNumber`
 	// (uint32, big endian). Because both parts have a fixed length, there is no
@@ -190,7 +191,7 @@ func writeDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
 		if err != nil {
 			return err
 		}
-		_, err = w.Write([]byte{byte(diagKeys[i].TransmissionRiskLevel)})
+		_, err = w.Write([]byte{diagKeys[i].TransmissionRiskLevel})
 		if err != nil {
 			return err
 		}
@@ -200,7 +201,7 @@ func writeDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
 }
 
 func (s Service) hydrateCache(ctx context.Context) error {
-	diagKeys, err := s.repo.FindAllDiagnosisKeys(ctx)
+	buf, err := s.repo.FindAllDiagnosisKeys(ctx)
 	if err != nil {
 		return err
 	}
@@ -210,15 +211,15 @@ func (s Service) hydrateCache(ctx context.Context) error {
 		return err
 	}
 
-	if err := s.cache.Set(diagKeys, lastModified); err != nil {
+	if err := s.cache.Set(buf, lastModified); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s Service) refreshCache(ctx context.Context) error {
-	t := time.NewTicker(5 * time.Minute)
+func (s Service) refreshCache(ctx context.Context, interval time.Duration) error {
+	t := time.NewTicker(interval)
 	for {
 		select {
 		case <-ctx.Done():

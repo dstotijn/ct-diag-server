@@ -3,6 +3,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -17,7 +18,8 @@ import (
 
 // Client implements diag.Repository.
 type Client struct {
-	db *sql.DB
+	db                *sql.DB
+	lastKnownKeyCount int
 }
 
 // New returns a new Client.
@@ -84,11 +86,13 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	return nil
 }
 
-// FindAllDiagnosisKeys retrieves an array of all diagnosis keys from the database.
-func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
-	var diagKeys []diag.DiagnosisKey
+// FindAllDiagnosisKeys finds all the Diagnosis Keys and returns them in their
+// binary representation in a buffer.
+func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]byte, error) {
+	// Reduce the amount of allocs by anticipating the needed slice capacity.
+	buf := bytes.NewBuffer(make([]byte, 0, c.lastKnownKeyCount*diag.DiagnosisKeySize))
 
-	query := `SELECT temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at
+	query := `SELECT temporary_exposure_key, rolling_start_number, transmission_risk_level
 	FROM diagnosis_keys
 	ORDER BY index ASC`
 
@@ -98,21 +102,22 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	}
 	defer rows.Close()
 
+	var rowCount int
 	for rows.Next() {
+		rowCount++
 		var diagKey diag.DiagnosisKey
-		key := make([]byte, 0, 16)
-		err := rows.Scan(
-			&key,
-			&diagKey.RollingStartNumber,
-			&diagKey.TransmissionRiskLevel,
-			&diagKey.UploadedAt,
-		)
+		key := diagKey.TemporaryExposureKey[:0]
+		err := rows.Scan(&key, &diagKey.RollingStartNumber, &diagKey.TransmissionRiskLevel)
 		if err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}
 		copy(diagKey.TemporaryExposureKey[:], key)
 		diagKey.UploadedAt = diagKey.UploadedAt.In(time.UTC)
-		diagKeys = append(diagKeys, diagKey)
+
+		err = diag.WriteDiagnosisKeys(buf, diagKey)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: could not write to buffer: %v", err)
+		}
 	}
 	rows.Close()
 
@@ -120,7 +125,9 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 		return nil, fmt.Errorf("postgres: could not iterate over rows: %v", err)
 	}
 
-	return diagKeys, nil
+	c.lastKnownKeyCount = rowCount
+
+	return buf.Bytes(), nil
 }
 
 // LastModified returns the timestamp of the latest uploaded Diagnosis Key.
