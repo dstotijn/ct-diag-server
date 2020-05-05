@@ -90,17 +90,16 @@ The endpoint supports byte range requests as defined in [RFC 7233](https://tools
 The `HEAD` method may be used to obtain `Last-Modified` and `Content-Length` headers
 for cache control purposes.
 
-A query parameter (`since`) allows clients to reduce the HTTP response size, by
-only querying for Diagnosis Keys that were uploaded since a given date, with a
-granularity of one day. Because of this granularity, when using this parameter for
-a daily request, clients should always query with a `since` value one day in the
-past (UTC), to ensure no data is missed for the current/ongoing day.
+A query parameter (`after`) allows clients to only fetch keys that haven't been
+handled on the device yet, to minimize redundant network traffic and parsing time.
+Pass the last known/handled key (hexadecimal encoding) to retrieve only new keys
+uploaded _after_ the given key.
 
 #### Query parameters
 
-| Name    | Description                                                                                                                                         |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `since` | Used for listing diagnosis keys uploaded since a given date, with a granularity of one day. Format: `yyyy-mm-dd`. Example: `2020-05-03`. (Optional) |
+| Name    | Description                                                                                                                                                                       |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `after` | Used for listing diagnosis keys uploaded _after_ the given key. Format: hexadecimal encoding of a Temporary Exposure Key. Example: `a7752b99be501c9c9e893b213ad82842`. (Optional) |
 
 #### Response
 

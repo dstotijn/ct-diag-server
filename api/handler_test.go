@@ -182,11 +182,11 @@ func TestListDiagnosisKeys(t *testing.T) {
 		}
 	})
 
-	t.Run("with `since` query parameter", func(t *testing.T) {
+	t.Run("with `after` query parameter", func(t *testing.T) {
 		tests := []struct {
 			name          string
 			diagKeys      []diag.DiagnosisKey
-			since         string
+			after         string
 			expStatusCode int
 			expBody       string
 			expDiagKeys   []diag.DiagnosisKey
@@ -194,188 +194,60 @@ func TestListDiagnosisKeys(t *testing.T) {
 			{
 				name:          "invalid query parameter",
 				diagKeys:      nil,
-				since:         "foobar",
+				after:         "foobar",
 				expStatusCode: 400,
 				expDiagKeys:   nil,
-				expBody:       "Invalid `since` query parameter (foobar), must be formatted as \"yyyy-mm-dd\".",
+				expBody:       "Invalid `after` query parameter, must be the hexadecimal encoding of a 16 byte key.",
 			},
 			{
 				name:          "no diagnosis keys in database",
 				diagKeys:      nil,
-				since:         "2020-05-03",
+				after:         "a7752b99be501c9c9e893b213ad82842",
 				expStatusCode: 200,
 				expDiagKeys:   nil,
 			},
 			{
-				name:  "since date on oldest created_at day in database",
-				since: "2020-05-02",
+				name:  "after is earliest key in database",
+				after: "01010101010101010101010101010101",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 					},
 					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-					},
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
+						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 					},
 				},
 			},
 			{
-				name:  "since date on latest created_at day in database",
-				since: "2020-05-03",
+				name:  "after is latest key in database",
+				after: "02020202020202020202020202020202",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 					},
 					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
-					},
-				},
-				expStatusCode: 200,
-				expDiagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-					},
-				},
-			},
-			{
-				name:  "since date older than oldest created_at day in database",
-				since: "2020-05-01",
-				diagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
-					},
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
-					},
-				},
-				expStatusCode: 200,
-				expDiagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-					},
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-					},
-				},
-			},
-			{
-				name:  "since date later than newest created_at day in database",
-				since: "2020-05-04",
-				diagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
-					},
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys:   nil,
 			},
 			{
-				name:  "since date between oldest and newest created_at day in database",
-				since: "2020-05-03",
+				name:  "after key not found",
+				after: "a7752b99be501c9c9e893b213ad82842",
 				diagKeys: []diag.DiagnosisKey{
 					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
-					},
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 03, 13, 37, 0, 0, time.UTC),
-					},
-					{
-						TemporaryExposureKey:  [16]byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
+						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 					},
 				},
 				expStatusCode: 200,
-				expDiagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-					},
-					{
-						TemporaryExposureKey:  [16]byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-					},
-				},
-			},
-			{
-				name:  "since date between oldest and newest, but in between day offsets",
-				since: "2020-05-03",
-				diagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 02, 13, 37, 0, 0, time.UTC),
-					},
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-						UploadedAt:            time.Date(2020, 05, 04, 13, 37, 0, 0, time.UTC),
-					},
-				},
-				expStatusCode: 200,
-				expDiagKeys: []diag.DiagnosisKey{
-					{
-						TemporaryExposureKey:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-						RollingStartNumber:    uint32(42),
-						TransmissionRiskLevel: 50,
-					},
-				},
+				expDiagKeys:   nil,
 			},
 		}
 
@@ -393,7 +265,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 				handler := newTestHandler(t, cfg)
 				req := httptest.NewRequest("GET", "http://example.com/diagnosis-keys", nil)
 				qp := req.URL.Query()
-				qp.Add("since", tt.since)
+				qp.Add("after", tt.after)
 				req.URL.RawQuery = qp.Encode()
 				w := httptest.NewRecorder()
 

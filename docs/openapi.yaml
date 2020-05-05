@@ -24,7 +24,7 @@ info:
   license:
     name: MIT
     url: https://github.com/dstotijn/ct-diag-server/blob/master/LICENSE
-  version: 0.5.0
+  version: 0.7.0
 externalDocs:
   url: https://github.com/dstotijn/ct-diag-server
 servers:
@@ -45,16 +45,16 @@ paths:
 
         A `500 Internal Server Error` response indicates server failure, and warrants a retry
 
-        The HTTP response body is a bytestream of Diagnosis Keys. A diagnosis key consists
-        of two parts: the `TemporaryExposureKey` itself (16 bytes), and 4 bytes (big endian)
-        for the `ENIntervalNumber` of the key, referred to as the "startRollingNumber" in
-        the spec. Because the amount of bytes per Diagnosis Key is fixed, there is no delimiter.
+        The HTTP request body should be a bytestream of `1 <= n` Diagnosis Keys, where
+        `n` is the max upload batch size configured on the server (default: 14).
+        A diagnosis key consists of three parts: the `TemporaryExposureKey` itself (16 bytes), the `RollingStartNumber` (4 bytes, big endian) and the `TransmissionRiskLevel` (1 byte).
+        Because the amount of bytes per Diagnosis Key is fixed, there is no delimiter
       parameters:
-        - name: string
+        - name: after
           in: query
-          description:
-            "Used for listing diagnosis keys uploaded since a given date,
-            with a granularity of one day. Format: `yyyy-mm-dd`. Example: `2020-05-03`."
+          description: |-
+            Used for listing diagnosis keys uploaded _after_ the given key. Format: hexadecimal encoding of a Temporary Exposure Key.
+            example: a7752b99be501c9c9e893b213ad82842
           required: false
           style: form
           explode: true

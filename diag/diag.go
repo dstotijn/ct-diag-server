@@ -90,7 +90,7 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 	if err := svc.hydrateCache(ctx); err != nil {
 		return Service{}, fmt.Errorf("diag: could not hydrate cache: %v", err)
 	}
-	n, err := svc.cache.ReadSeeker(time.Time{}).Seek(0, io.SeekEnd)
+	n, err := svc.cache.ReadSeeker([16]byte{}).Seek(0, io.SeekEnd)
 	if err != nil {
 		return Service{}, fmt.Errorf("diag: could not seek cache: %v", err)
 	}
@@ -157,10 +157,10 @@ func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
 }
 
 // ReadSeeker returns an io.ReadSeeker for accessing the cache.
-// When a non zero `since` value is passed, Diagnosis Keys from that timestamp
-// (truncated by day) onwards will be returned. Else, all contents are used.
-func (s Service) ReadSeeker(since time.Time) io.ReadSeeker {
-	return s.cache.ReadSeeker(since)
+// If a non zero `after` value is passed, Diagnosis Keys uploaded after
+// this key will be will be returned. Else, all contents are used.
+func (s Service) ReadSeeker(after [16]byte) io.ReadSeeker {
+	return s.cache.ReadSeeker(after)
 }
 
 // LastModified returns the timestamp of the latest Diagnosis Key upload.
@@ -206,10 +206,7 @@ func (s Service) hydrateCache(ctx context.Context) error {
 	}
 
 	lastModified, err := s.repo.LastModified(ctx)
-	if err == ErrNilDiagKeys {
-		return nil
-	}
-	if err != nil {
+	if err != nil && err != ErrNilDiagKeys {
 		return err
 	}
 
@@ -231,7 +228,7 @@ func (s Service) refreshCache(ctx context.Context) error {
 				s.logger.Error("Could not refresh cache", zap.Error(err))
 				continue
 			}
-			n, err := s.cache.ReadSeeker(time.Time{}).Seek(0, io.SeekEnd)
+			n, err := s.cache.ReadSeeker([16]byte{}).Seek(0, io.SeekEnd)
 			if err != nil {
 				s.logger.Error("Could not seek cache", zap.Error(err))
 				continue

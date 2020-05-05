@@ -4,9 +4,9 @@ package api
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/dstotijn/ct-diag-server/diag"
 
@@ -58,19 +58,20 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	var since time.Time
-	sinceParam := r.URL.Query().Get("since")
-	if sinceParam != "" {
-		var err error
-		since, err = time.Parse("2006-01-02", sinceParam)
-		if err != nil {
-			msg := fmt.Sprintf("Invalid `since` query parameter (%v), must be formatted as \"yyyy-mm-dd\".", sinceParam)
+	var after [16]byte
+	afterParam := r.URL.Query().Get("after")
+	if afterParam != "" {
+		buf, err := hex.DecodeString(afterParam)
+		if err != nil || len(buf) != 16 {
+			msg := fmt.Sprintf("Invalid `after` query parameter, must be the hexadecimal encoding of a 16 byte key.")
 			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
+
+		copy(after[:], buf)
 	}
 
-	rs := h.diagSvc.ReadSeeker(since)
+	rs := h.diagSvc.ReadSeeker(after)
 	lastModified := h.diagSvc.LastModified()
 	http.ServeContent(w, r, "", lastModified, rs)
 }
