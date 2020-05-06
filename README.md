@@ -3,6 +3,7 @@
 [![CircleCI](https://circleci.com/gh/dstotijn/ct-diag-server.svg?style=shield)](https://circleci.com/gh/dstotijn/ct-diag-server)
 [![Coverage Status](https://coveralls.io/repos/github/dstotijn/ct-diag-server/badge.svg?branch=master)](https://coveralls.io/github/dstotijn/ct-diag-server?branch=master)
 [![GitHub](https://img.shields.io/github/license/dstotijn/ct-diag-server)](LICENSE)
+[![OpenAPI Validator](https://img.shields.io/swagger/valid/3.0?label=openapi&specUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fdstotijn%2Fct-diag-server%2Fmaster%2Fdocs%2Fopenapi.yaml)](https://app.swaggerhub.com/apis/dstotijn84/ct-diag-server)
 [![GoDoc](https://godoc.org/github.com/dstotijn/ct-diag-server?status.svg)](https://godoc.org/github.com/dstotijn/ct-diag-server)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dstotijn/ct-diag-server)](https://goreportcard.com/report/github.com/dstotijn/ct-diag-server)
 
