@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -84,6 +85,51 @@ func TestHealth(t *testing.T) {
 
 	if got := strings.TrimSpace(string(body)); got != expBody {
 		t.Errorf("expected: %v, got: `%s`", expBody, got)
+	}
+}
+
+func TestExposureConfig(t *testing.T) {
+	exp := diag.ExposureConfig{
+		MinimumRiskScore:                 0,
+		AttenuationLevelValues:           []int{1, 2, 3, 4, 5, 6, 7, 8},
+		AttenuationWeight:                50,
+		DaysSinceLastExposureLevelValues: []int{1, 2, 3, 4, 5, 6, 7, 8},
+		DaysSinceLastExposureWeight:      50,
+		DurationLevelValues:              []int{1, 2, 3, 4, 5, 6, 7, 8},
+		DurationWeight:                   50,
+		TransmissionRiskLevelValues:      []int{1, 2, 3, 4, 5, 6, 7, 8},
+		TransmissionRiskWeight:           50,
+	}
+
+	handler := newTestHandler(t, &diag.Config{
+		Repository:     noopRepo,
+		ExposureConfig: exp,
+	})
+
+	req := httptest.NewRequest("GET", "http://example.com/exposure-config", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+	resp := w.Result()
+
+	expStatusCode := 200
+	if got := resp.StatusCode; got != expStatusCode {
+		t.Errorf("expected: %v, got: %v", expStatusCode, got)
+	}
+
+	expContentType := "application/json"
+	if got := resp.Header.Get("Content-Type"); got != expContentType {
+		t.Errorf("expected: %v, got: %v", expContentType, got)
+	}
+
+	var got diag.ExposureConfig
+	err := json.NewDecoder(resp.Body).Decode(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("expected: %v, got: `%v`", exp, got)
 	}
 }
 

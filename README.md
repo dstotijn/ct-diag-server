@@ -159,6 +159,45 @@ A `400 Bad Request` response is used for client errors. A `500 Internal Server E
 response is used for server errors, and warrants a retry. Error reasons are written
 in a `text/plain; charset=utf-8` response body.
 
+### Retrieving exposure configuration
+
+To be used for fetching an [ENExposureConfiguration](https://developer.apple.com/documentation/exposurenotification/enexposureconfiguration) object (see Apple‘s [sample code](https://developer.apple.com/documentation/exposurenotification/building_an_app_to_notify_users_of_covid-19_exposure#3587485) article).
+
+#### Request
+
+`GET /exposure-config`
+
+#### Response headers
+
+| Name                             | Description                                          |
+| -------------------------------- | ---------------------------------------------------- |
+| `Content-Type: application/json` | The response contains an object in JSON (see below). |
+
+#### Response
+
+A `200 OK` response should be expected. A `500 Internal Server Error` response
+indicates server failure, and warrants a retry.
+
+#### Response body
+
+The HTTP response body is a [ENExposureConfiguration](https://developer.apple.com/documentation/exposurenotification/enexposureconfiguration) object, encoded in JSON.
+
+**Example:**
+
+```json
+{
+  "minimumRiskScore": 0,
+  "attenuationLevelValues": [1, 2, 3, 4, 5, 6, 7, 8],
+  "attenuationWeight": 50,
+  "daysSinceLastExposureLevelValues": [1, 2, 3, 4, 5, 6, 7, 8],
+  "daysSinceLastExposureWeight": 50,
+  "durationLevelValues": [1, 2, 3, 4, 5, 6, 7, 8],
+  "durationWeight": 50,
+  "transmissionRiskLevelValues": [1, 2, 3, 4, 5, 6, 7, 8],
+  "transmissionRiskWeight": 50
+}
+```
+
 ## TODO
 
 👉 See [issue tracker](https://github.com/dstotijn/ct-diag-server/issues).

@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -30,9 +31,15 @@ func NewHandler(ctx context.Context, cfg diag.Config, logger *zap.Logger) (http.
 		logger:  logger,
 	}
 
+	expConfigHandler, err := exposureConfig(cfg.ExposureConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/diagnosis-keys", h.diagnosisKeys)
+	mux.HandleFunc("/exposure-config", expConfigHandler)
 	mux.HandleFunc("/health", h.health)
 
 	return mux, nil
@@ -104,4 +111,17 @@ func (h *handler) health(w http.ResponseWriter, r *http.Request) {
 func writeInternalErrorResp(w http.ResponseWriter, err error) {
 	code := http.StatusInternalServerError
 	http.Error(w, http.StatusText(code), code)
+}
+
+// exposureConfig returns the exposure configuration in JSON.
+func exposureConfig(expCfg diag.ExposureConfig) (http.HandlerFunc, error) {
+	buf, err := json.Marshal(expCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(buf)
+	}, nil
 }

@@ -48,11 +48,24 @@ func main() {
 		logger.Fatal("Could not connect to database.", zap.Error(err))
 	}
 
+	exposureCfg := diag.ExposureConfig{
+		MinimumRiskScore:                 0,
+		AttenuationLevelValues:           []int{1, 2, 3, 4, 5, 6, 7, 8},
+		AttenuationWeight:                50,
+		DaysSinceLastExposureLevelValues: []int{1, 2, 3, 4, 5, 6, 7, 8},
+		DaysSinceLastExposureWeight:      50,
+		DurationLevelValues:              []int{1, 2, 3, 4, 5, 6, 7, 8},
+		DurationWeight:                   50,
+		TransmissionRiskLevelValues:      []int{1, 2, 3, 4, 5, 6, 7, 8},
+		TransmissionRiskWeight:           50,
+	}
+
 	cfg := diag.Config{
 		Repository:         db,
 		Cache:              &diag.MemoryCache{},
 		CacheInterval:      cacheInterval,
 		MaxUploadBatchSize: maxUploadBatchSize,
+		ExposureConfig:     exposureCfg,
 		Logger:             logger,
 	}
 	handler, err := api.NewHandler(ctx, cfg, logger)

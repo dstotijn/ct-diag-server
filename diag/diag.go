@@ -40,6 +40,20 @@ type DiagnosisKey struct {
 	UploadedAt            time.Time
 }
 
+// ExposureConfig represents the parameters for detecting exposure.
+// @see https://developer.apple.com/documentation/exposurenotification/enexposureconfiguration
+type ExposureConfig struct {
+	MinimumRiskScore                 int   `json:"minimumRiskScore"`
+	AttenuationLevelValues           []int `json:"attenuationLevelValues"`
+	AttenuationWeight                int   `json:"attenuationWeight"`
+	DaysSinceLastExposureLevelValues []int `json:"daysSinceLastExposureLevelValues"`
+	DaysSinceLastExposureWeight      int   `json:"daysSinceLastExposureWeight"`
+	DurationLevelValues              []int `json:"durationLevelValues"`
+	DurationWeight                   int   `json:"durationWeight"`
+	TransmissionRiskLevelValues      []int `json:"transmissionRiskLevelValues"`
+	TransmissionRiskWeight           int   `json:"transmissionRiskWeight"`
+}
+
 // Repository defines an interface for storing and retrieving diagnosis keys
 // in a repository.
 type Repository interface {
@@ -63,6 +77,7 @@ type Config struct {
 	CacheInterval      time.Duration
 	MaxUploadBatchSize uint
 	Logger             *zap.Logger
+	ExposureConfig     ExposureConfig
 }
 
 // NewService returns a new Service.

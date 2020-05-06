@@ -24,7 +24,7 @@ info:
   license:
     name: MIT
     url: https://github.com/dstotijn/ct-diag-server/blob/master/LICENSE
-  version: 0.7.0
+  version: 0.8.0
 externalDocs:
   url: https://github.com/dstotijn/ct-diag-server
 servers:
@@ -53,7 +53,7 @@ paths:
         - name: after
           in: query
           description: |-
-            Used for listing diagnosis keys uploaded _after_ the given key. Format: hexadecimal encoding of a Temporary Exposure Key.
+            Used for listing diagnosis keys uploaded after the given key. Format: hexadecimal encoding of a Temporary Exposure Key.
             example: a7752b99be501c9c9e893b213ad82842
           required: false
           style: form
@@ -166,6 +166,19 @@ paths:
               schema:
                 type: string
                 example: Internal Server Error
+  /exposure-config:
+    get:
+      description:
+        To be used for fetching an [ENExposureConfiguration](https://developer.apple.com/documentation/exposurenotification/enexposureconfiguration)
+        object (see Apple‘s [sample code](https://developer.apple.com/documentation/exposurenotification/building_an_app_to_notify_users_of_covid-19_exposure#3587485)
+        article).
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExposureConfiguration"
   /health:
     get:
       description: Health check. To be used for checking if the server is operational.
@@ -177,4 +190,48 @@ paths:
               schema:
                 type: string
                 example: OK
-components: {}
+components:
+  schemas:
+    ExposureConfiguration:
+      type: object
+      properties:
+        minimumRiskScore:
+          type: integer
+          format: uint8
+          example: 0
+        attenuationLevelValues:
+          type: array
+          items:
+            type: integer
+            format: uint8
+        attenuationWeight:
+          type: number
+          format: double
+          example: 50
+        daysSinceLastExposureLevelValues:
+          type: array
+          items:
+            type: integer
+            format: uint8
+        daysSinceLastExposureWeight:
+          type: number
+          format: double
+          example: 50
+        durationLevelValues:
+          type: array
+          items:
+            type: integer
+            format: uint8
+        durationWeight:
+          type: number
+          format: double
+          example: 50
+        transmissionRiskLevelValues:
+          type: array
+          items:
+            type: integer
+            format: uint8
+        transmissionRiskWeight:
+          type: number
+          format: double
+          example: 50
