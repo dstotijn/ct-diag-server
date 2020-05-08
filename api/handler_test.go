@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -45,7 +46,7 @@ var noopRepo = testRepository{
 	lastModifiedFn:         func(_ context.Context) (time.Time, error) { return time.Time{}, nil },
 }
 
-func newTestHandler(t *testing.T, cfg *diag.Config) http.Handler {
+func newTestHandler(t testing.TB, cfg *diag.Config) http.Handler {
 	if cfg == nil {
 		cfg = &diag.Config{Repository: noopRepo}
 	}
@@ -585,5 +586,46 @@ func TestUnsupportedMethod(t *testing.T) {
 	expStatusCode := 405
 	if got := resp.StatusCode; got != expStatusCode {
 		t.Errorf("expected: %v, got: %v", expStatusCode, got)
+	}
+}
+
+var benchResp *http.Response
+
+func BenchmarkListDiagnosisKeys(b *testing.B) {
+	benchmarks := []struct {
+		name         string
+		diagKeyCount int
+	}{
+		{"0", 0},
+		{"1000", 1000},
+		{"10000", 10000},
+		{"100000", 100000},
+		{"1000000", 1000000},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			cache := &diag.MemoryCache{}
+			handler := newTestHandler(b, &diag.Config{
+				Repository: noopRepo,
+				Cache:      cache,
+			})
+
+			// Manually set in-memory cache with random data.
+			buf := make([]byte, bm.diagKeyCount*diag.DiagnosisKeySize)
+			if _, err := rand.Read(buf); err != nil {
+				b.Fatal(err)
+			}
+			cache.Set(buf, time.Now())
+
+			req := httptest.NewRequest("GET", "http://example.com/diagnosis-keys", nil)
+			w := httptest.NewRecorder()
+
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				handler.ServeHTTP(w, req)
+				benchResp = w.Result()
+			}
+		})
 	}
 }

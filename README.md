@@ -37,6 +37,7 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
 - [Goals](#goals)
 - [Features](#features)
 - [API reference](#api-reference)
+- [Benchmarks](#benchmarks)
 - [TODO](#todo)
 - [Status](#status)
 - [Contributors](#contributors)
@@ -197,6 +198,29 @@ The HTTP response body is a [ENExposureConfiguration](https://developer.apple.co
   "transmissionRiskLevelValues": [1, 2, 3, 4, 5, 6, 7, 8],
   "transmissionRiskWeight": 50
 }
+```
+
+## Benchmarks
+
+Benchmark System:
+
+- Mac mini (2018), 3 GHz 6-Core Intel Core i5
+- 8 GB 2667 MHz DDR4
+- go version go1.14.2 darwin/amd64
+- macOS Catalina 10.15.4
+
+```
+go test -bench=. -benchmem ./api
+goos: darwin
+goarch: amd64
+pkg: github.com/dstotijn/ct-diag-server/api
+BenchmarkListDiagnosisKeys/0-6         808357   1361 ns/op       273 B/op        12 allocs/op
+BenchmarkListDiagnosisKeys/1000-6      41138    26613 ns/op      88938 B/op      13 allocs/op
+BenchmarkListDiagnosisKeys/10000-6     9247     401333 ns/op     497426 B/op     13 allocs/op
+BenchmarkListDiagnosisKeys/100000-6    452      2269982 ns/op    4782890 B/op    13 allocs/op
+BenchmarkListDiagnosisKeys/1000000-6   96       17922161 ns/op   44766170 B/op   13 allocs/op
+PASS
+ok      github.com/dstotijn/ct-diag-server/api  9.907s
 ```
 
 ## TODO
