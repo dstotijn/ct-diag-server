@@ -37,6 +37,7 @@ or [open an issue](https://github.com/dstotijn/exp-notif-crypto/issues/new).
 - [Goals](#goals)
 - [Features](#features)
 - [API reference](#api-reference)
+- [Benchmarks](#benchmarks)
 - [TODO](#todo)
 - [Status](#status)
 - [Contributors](#contributors)

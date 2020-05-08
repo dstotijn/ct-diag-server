@@ -591,15 +591,6 @@ func TestUnsupportedMethod(t *testing.T) {
 
 var benchResp *http.Response
 
-func runListDiagnosisKeysBenchmark(b *testing.B, keyCount int) func(b *testing.B) {
-	return func(b *testing.B) {
-		b.RunParallel(func(pb *testing.PB) {
-			for pb.Next() {
-			}
-		})
-	}
-}
-
 func BenchmarkListDiagnosisKeys(b *testing.B) {
 	benchmarks := []struct {
 		name         string
