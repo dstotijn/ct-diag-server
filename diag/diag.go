@@ -5,22 +5,19 @@ package diag
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"time"
 
+	"github.com/dstotijn/ct-diag-server/diag/pb"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
-// DiagnosisKeySize represents the size of a Diagnosis Key when transmitted
-// over a network in bytes (16 bytes for the TemporaryExposure Key, 4 bytes
-// for the RollingStartNumber, and 1 byte for the TransmissionRiskLevel).
-const DiagnosisKeySize = 21
-
-const defaultMaxUploadBatchSize = 14
+// MaxUploadSize is the maximum size of uploads in bytes.
+const MaxUploadSize = 500 * 1000
 
 var (
 	// ErrNilDiagKeys is used when an empty diagnosis keyset is encountered.
@@ -58,26 +55,24 @@ type ExposureConfig struct {
 // in a repository.
 type Repository interface {
 	StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey, createdAt time.Time) error
-	FindAllDiagnosisKeys(ctx context.Context) ([]byte, error)
+	FindAllDiagnosisKeys(ctx context.Context) ([]DiagnosisKey, error)
 	LastModified(ctx context.Context) (time.Time, error)
 }
 
 // Service represents the service for managing diagnosis keys.
 type Service struct {
-	repo               Repository
-	cache              Cache
-	maxUploadBatchSize uint
-	logger             *zap.Logger
+	repo   Repository
+	cache  Cache
+	logger *zap.Logger
 }
 
 // Config represents the configuration to create a Service.
 type Config struct {
-	Repository         Repository
-	Cache              Cache
-	CacheInterval      time.Duration
-	MaxUploadBatchSize uint
-	Logger             *zap.Logger
-	ExposureConfig     ExposureConfig
+	Repository     Repository
+	Cache          Cache
+	CacheInterval  time.Duration
+	Logger         *zap.Logger
+	ExposureConfig ExposureConfig
 }
 
 // NewService returns a new Service.
@@ -86,10 +81,9 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 		return Service{}, errors.New("diag: logger cannot be nil")
 	}
 	svc := Service{
-		repo:               cfg.Repository,
-		cache:              cfg.Cache,
-		maxUploadBatchSize: cfg.MaxUploadBatchSize,
-		logger:             cfg.Logger,
+		repo:   cfg.Repository,
+		cache:  cfg.Cache,
+		logger: cfg.Logger,
 	}
 
 	// Default to in-memory cache.
@@ -102,20 +96,12 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 		cfg.CacheInterval = 5 * time.Minute
 	}
 
-	// Set sane default for max upload batch size.
-	if svc.maxUploadBatchSize == 0 {
-		svc.maxUploadBatchSize = defaultMaxUploadBatchSize
-	}
-
 	// Hydrate cache.
-	if err := svc.hydrateCache(ctx); err != nil {
+	n, err := svc.hydrateCache(ctx)
+	if err != nil {
 		return Service{}, fmt.Errorf("diag: could not hydrate cache: %v", err)
 	}
-	n, err := svc.cache.ReadSeeker([16]byte{}).Seek(0, io.SeekEnd)
-	if err != nil {
-		return Service{}, fmt.Errorf("diag: could not seek cache: %v", err)
-	}
-	svc.logger.Info("Cache hydrated.", zap.Int64("size", n))
+	svc.logger.Info("Cache hydrated.", zap.Int("size", n))
 
 	// Run cache refresh worker in separate goroutine.
 	go func() {
@@ -125,6 +111,26 @@ func NewService(ctx context.Context, cfg Config) (Service, error) {
 	}()
 
 	return svc, nil
+}
+
+// ListDiagnosisKeys returns all available Diagnosis Keys.
+func (s Service) ListDiagnosisKeys(after [16]byte) ([]DiagnosisKey, error) {
+	diagKeys, err := s.cache.Get()
+	if err != nil {
+		return nil, fmt.Errorf("diag: could not get diagnosis keys from cache: %v", err)
+	}
+
+	if after == [16]byte{} {
+		return diagKeys, nil
+	}
+
+	for i := range diagKeys {
+		if diagKeys[i].TemporaryExposureKey == after {
+			return diagKeys[i+1:], nil
+		}
+	}
+
+	return nil, nil
 }
 
 // StoreDiagnosisKeys persists a set of diagnosis keys to the repository.
@@ -138,99 +144,102 @@ func (s Service) StoreDiagnosisKeys(ctx context.Context, diagKeys []DiagnosisKey
 	return nil
 }
 
-// ParseDiagnosisKeys reads and parses diagnosis keys from an io.Reader.
-func ParseDiagnosisKeys(r io.Reader) ([]DiagnosisKey, error) {
+// ParseDiagnosisKeyFile reads and parses a Diagnosis Key protobuf from an io.Reader.
+func ParseDiagnosisKeyFile(r io.Reader) ([]DiagnosisKey, error) {
 	buf, err := ioutil.ReadAll(r)
-	n := len(buf)
-
-	switch {
-	case err != nil && err != io.EOF:
-		return nil, err
-	case n == 0:
-		return nil, io.ErrUnexpectedEOF
-	case n%DiagnosisKeySize != 0:
-		return nil, io.ErrUnexpectedEOF
+	if err != nil {
+		return nil, fmt.Errorf("diag: could not read diagnosis keys: %v", err)
 	}
 
-	keyCount := n / DiagnosisKeySize
-	diagKeys := make([]DiagnosisKey, keyCount)
+	diagKeyFile := &pb.File{}
+	if err := proto.Unmarshal(buf, diagKeyFile); err != nil {
+		return nil, fmt.Errorf("diag: could not decode protobuf: %v", err)
+	}
 
-	for i := 0; i < keyCount; i++ {
-		start := i * DiagnosisKeySize
-		var key [16]byte
-		copy(key[:], buf[start:start+16])
-		rollingStartNumber := binary.BigEndian.Uint32(buf[start+16 : start+DiagnosisKeySize])
-		transRiskLevel := buf[start+20]
+	if len(diagKeyFile.GetKey()) == 0 {
+		return nil, nil
+	}
+
+	diagKeys := make([]DiagnosisKey, len(diagKeyFile.GetKey()))
+	for i := range diagKeyFile.Key {
+		var tek [16]byte
+		n := copy(tek[:], diagKeyFile.Key[i].KeyData)
+		if n != 16 {
+			return nil, fmt.Errorf("diag: unexpected key length (%d)", n)
+		}
+
+		rollingStartNumber := diagKeyFile.Key[i].GetRollingStartNumber()
+		if rollingStartNumber == 0 {
+			return nil, errors.New("diag: rollingStartNumber cannot be 0")
+		}
+
+		transRiskLevel := diagKeyFile.Key[i].GetTransmissionRiskLevel()
+		if transRiskLevel > 255 {
+			return nil, errors.New("diag: transmissionRiskLevel does not fit uint8 range")
+		}
 
 		diagKeys[i] = DiagnosisKey{
-			TemporaryExposureKey:  key,
+			TemporaryExposureKey:  tek,
 			RollingStartNumber:    rollingStartNumber,
-			TransmissionRiskLevel: transRiskLevel,
+			TransmissionRiskLevel: uint8(transRiskLevel),
 		}
 	}
 
 	return diagKeys, nil
 }
 
-// ReadSeeker returns an io.ReadSeeker for accessing the cache.
-// If a non zero `after` value is passed, Diagnosis Keys uploaded after
-// this key will be will be returned. Else, all contents are used.
-func (s Service) ReadSeeker(after [16]byte) io.ReadSeeker {
-	return s.cache.ReadSeeker(after)
-}
-
 // LastModified returns the timestamp of the latest Diagnosis Key upload.
-func (s Service) LastModified() time.Time {
-	return s.cache.LastModified().UTC()
+func (s Service) LastModified() (time.Time, error) {
+	lastModified, err := s.cache.LastModified()
+	if err != nil {
+		return time.Time{}, fmt.Errorf("diag: could not get last modified: %v", err)
+	}
+
+	return lastModified.UTC(), nil
 }
 
-// MaxUploadBatchSize returns the maximum number of diagnosis keys to be uploaded
-// per request.
-func (s Service) MaxUploadBatchSize() uint {
-	return s.maxUploadBatchSize
-}
+// WriteDiagnosisKeyProtobuf writes Diagnosis Keys as a protobuf to an io.Writer,
+// and returns the bytes written.
+func WriteDiagnosisKeyProtobuf(w io.Writer, diagKeys ...DiagnosisKey) (int, error) {
+	keyFile := &pb.File{
+		Key: make([]*pb.Key, len(diagKeys)),
+	}
 
-func WriteDiagnosisKeys(w io.Writer, diagKeys ...DiagnosisKey) error {
-	// Write binary data for the diagnosis keys. Per diagnosis key, 16 bytes are
-	// written with the diagnosis key itself, and 4 bytes for `RollingStartNumber`
-	// (uint32, big endian). Because both parts have a fixed length, there is no
-	// delimiter.
+	// TODO: Add `Header` message.
+
 	for i := range diagKeys {
-		_, err := w.Write(diagKeys[i].TemporaryExposureKey[:])
-		if err != nil {
-			return err
-		}
-		rollingStartNumber := make([]byte, 4)
-		binary.BigEndian.PutUint32(rollingStartNumber, diagKeys[i].RollingStartNumber)
-		_, err = w.Write(rollingStartNumber)
-		if err != nil {
-			return err
-		}
-		_, err = w.Write([]byte{diagKeys[i].TransmissionRiskLevel})
-		if err != nil {
-			return err
+		keyFile.Key[i] = &pb.Key{
+			KeyData:               diagKeys[i].TemporaryExposureKey[:],
+			RollingPeriod:         proto.Uint32(42),
+			RollingStartNumber:    proto.Uint32(diagKeys[i].RollingStartNumber),
+			TransmissionRiskLevel: proto.Int32(int32(diagKeys[i].TransmissionRiskLevel)),
 		}
 	}
 
-	return nil
+	buf, err := proto.Marshal(keyFile)
+	if err != nil {
+		return 0, fmt.Errorf("diag: could not encode to protobuf: %v", err)
+	}
+
+	return w.Write(buf)
 }
 
-func (s Service) hydrateCache(ctx context.Context) error {
-	buf, err := s.repo.FindAllDiagnosisKeys(ctx)
+func (s Service) hydrateCache(ctx context.Context) (int, error) {
+	diagKeys, err := s.repo.FindAllDiagnosisKeys(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	lastModified, err := s.repo.LastModified(ctx)
 	if err != nil && err != ErrNilDiagKeys {
-		return err
+		return 0, err
 	}
 
-	if err := s.cache.Set(buf, lastModified); err != nil {
-		return err
+	if err := s.cache.Set(diagKeys, lastModified); err != nil {
+		return 0, err
 	}
 
-	return nil
+	return len(diagKeys), nil
 }
 
 func (s Service) refreshCache(ctx context.Context, interval time.Duration) error {
@@ -240,17 +249,13 @@ func (s Service) refreshCache(ctx context.Context, interval time.Duration) error
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-t.C:
-			if err := s.hydrateCache(ctx); err != nil {
+			n, err := s.hydrateCache(ctx)
+			if err != nil {
 				s.logger.Error("Could not refresh cache", zap.Error(err))
 				continue
 			}
-			n, err := s.cache.ReadSeeker([16]byte{}).Seek(0, io.SeekEnd)
-			if err != nil {
-				s.logger.Error("Could not seek cache", zap.Error(err))
-				continue
-			}
 
-			s.logger.Info("Cache refreshed.", zap.Int64("size", n))
+			s.logger.Info("Cache refreshed.", zap.Int("size", n))
 		}
 	}
 }

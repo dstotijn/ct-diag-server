@@ -3,11 +3,14 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/dstotijn/ct-diag-server/diag"
 
@@ -78,18 +81,42 @@ func (h *handler) listDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
 		copy(after[:], buf)
 	}
 
-	rs := h.diagSvc.ReadSeeker(after)
-	lastModified := h.diagSvc.LastModified()
-	http.ServeContent(w, r, "", lastModified, rs)
+	diagKeys, err := h.diagSvc.ListDiagnosisKeys(after)
+	if err != nil {
+		h.logger.Error("Could not fetch diagnosis keys", zap.Error(err))
+		writeInternalErrorResp(w, err)
+		return
+	}
+
+	if len(diagKeys) == 0 {
+		w.Header().Set("Content-Length", "0")
+		return
+	}
+
+	buf := &bytes.Buffer{}
+	n, err := diag.WriteDiagnosisKeyProtobuf(buf, diagKeys...)
+	if err != nil {
+		h.logger.Error("Could not write diagnosis keys to protobuf", zap.Error(err))
+		writeInternalErrorResp(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Length", strconv.Itoa(n))
+	io.Copy(w, buf)
 }
 
 // postDiagnosisKeys reads POST data from an HTTP request and stores it.
 func (h *handler) postDiagnosisKeys(w http.ResponseWriter, r *http.Request) {
-	uploadLimit := h.diagSvc.MaxUploadBatchSize() * diag.DiagnosisKeySize
-	maxBytesReader := http.MaxBytesReader(w, r.Body, int64(uploadLimit))
-	diagKeys, err := diag.ParseDiagnosisKeys(maxBytesReader)
+	maxBytesReader := http.MaxBytesReader(w, r.Body, diag.MaxUploadSize)
+	diagKeys, err := diag.ParseDiagnosisKeyFile(maxBytesReader)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid body: %v", err), http.StatusBadRequest)
+		return
+	}
+	maxBytesReader.Close()
+
+	if len(diagKeys) == 0 {
+		http.Error(w, "Missing request body", http.StatusBadRequest)
 		return
 	}
 

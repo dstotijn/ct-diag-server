@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"log"
@@ -172,7 +171,7 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 		{
 			name:        "no diagnosis keys in database",
 			diagKeys:    nil,
-			expDiagKeys: nil,
+			expDiagKeys: []diag.DiagnosisKey{},
 			expError:    nil,
 		},
 		{
@@ -230,14 +229,8 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 				t.Fatalf("expected: %v, got: %v", tt.expError, err)
 			}
 
-			expDiagKeys := &bytes.Buffer{}
-			err = diag.WriteDiagnosisKeys(expDiagKeys, tt.expDiagKeys...)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !bytes.Equal(diagKeys, expDiagKeys.Bytes()) {
-				t.Errorf("expected: %+v, got: %+v", expDiagKeys.Bytes(), diagKeys)
+			if !reflect.DeepEqual(diagKeys, tt.expDiagKeys) {
+				t.Errorf("expected: %v, got: %v", tt.expDiagKeys, diagKeys)
 			}
 		})
 	}

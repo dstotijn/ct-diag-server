@@ -3,7 +3,6 @@
 package postgres
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -88,9 +87,9 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 
 // FindAllDiagnosisKeys finds all the Diagnosis Keys and returns them in their
 // binary representation in a buffer.
-func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]byte, error) {
+func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
 	// Reduce the amount of allocs by anticipating the needed slice capacity.
-	buf := bytes.NewBuffer(make([]byte, 0, c.lastKnownKeyCount*diag.DiagnosisKeySize))
+	diagKeys := make([]diag.DiagnosisKey, 0, c.lastKnownKeyCount)
 
 	query := `SELECT temporary_exposure_key, rolling_start_number, transmission_risk_level
 	FROM diagnosis_keys
@@ -114,10 +113,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]byte, error) {
 		copy(diagKey.TemporaryExposureKey[:], key)
 		diagKey.UploadedAt = diagKey.UploadedAt.In(time.UTC)
 
-		err = diag.WriteDiagnosisKeys(buf, diagKey)
-		if err != nil {
-			return nil, fmt.Errorf("postgres: could not write to buffer: %v", err)
-		}
+		diagKeys = append(diagKeys, diagKey)
 	}
 	rows.Close()
 
@@ -127,7 +123,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]byte, error) {
 
 	c.lastKnownKeyCount = rowCount
 
-	return buf.Bytes(), nil
+	return diagKeys, nil
 }
 
 // LastModified returns the timestamp of the latest uploaded Diagnosis Key.
