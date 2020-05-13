@@ -3,15 +3,12 @@ package api
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +20,7 @@ import (
 
 type testRepository struct {
 	storeDiagnosisKeysFn   func(context.Context, []diag.DiagnosisKey, time.Time) error
-	findAllDiagnosisKeysFn func(context.Context) ([]byte, error)
+	findAllDiagnosisKeysFn func(context.Context) ([]diag.DiagnosisKey, error)
 	lastModifiedFn         func(context.Context) (time.Time, error)
 }
 
@@ -31,7 +28,7 @@ func (ts testRepository) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag
 	return ts.storeDiagnosisKeysFn(ctx, diagKeys, createdAt)
 }
 
-func (ts testRepository) FindAllDiagnosisKeys(ctx context.Context) ([]byte, error) {
+func (ts testRepository) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey, error) {
 	return ts.findAllDiagnosisKeysFn(ctx)
 }
 
@@ -41,7 +38,7 @@ func (ts testRepository) LastModified(ctx context.Context) (time.Time, error) {
 
 var noopRepo = testRepository{
 	storeDiagnosisKeysFn:   func(_ context.Context, _ []diag.DiagnosisKey, _ time.Time) error { return nil },
-	findAllDiagnosisKeysFn: func(_ context.Context) ([]byte, error) { return nil, nil },
+	findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) { return nil, nil },
 	lastModifiedFn:         func(_ context.Context) (time.Time, error) { return time.Time{}, nil },
 }
 
@@ -161,15 +158,12 @@ func TestListDiagnosisKeys(t *testing.T) {
 				TransmissionRiskLevel: 50,
 			},
 		}
-		expLastModified := time.Date(2020, time.May, 2, 23, 30, 0, 0, time.UTC)
 		cfg := &diag.Config{
 			Repository: testRepository{
-				findAllDiagnosisKeysFn: func(_ context.Context) ([]byte, error) {
-					buf := &bytes.Buffer{}
-					diag.WriteDiagnosisKeys(buf, expDiagKeys...)
-					return buf.Bytes(), nil
+				findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
+					return expDiagKeys, nil
 				},
-				lastModifiedFn: func(_ context.Context) (time.Time, error) { return expLastModified, nil },
+				lastModifiedFn: noopRepo.lastModifiedFn,
 			},
 		}
 
@@ -185,44 +179,9 @@ func TestListDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expContentLength := strconv.Itoa(len(expDiagKeys) * diag.DiagnosisKeySize)
-		if got := resp.Header.Get("Content-Length"); got != expContentLength {
-			t.Fatalf("expected: %v, got: %v", expContentLength, got)
-		}
-
-		if got := resp.Header.Get("Last-Modified"); got != expLastModified.Format(http.TimeFormat) {
-			t.Fatalf("expected: %v, got: %v", expLastModified.Format(http.TimeFormat), got)
-		}
-
-		var got []diag.DiagnosisKey
-
-		for {
-			var key [16]byte
-			_, err := io.ReadFull(resp.Body, key[:])
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			var rollingStartNumber uint32
-			err = binary.Read(resp.Body, binary.BigEndian, &rollingStartNumber)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			buf := make([]byte, 1)
-			_, err = resp.Body.Read(buf)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			got = append(got, diag.DiagnosisKey{
-				TemporaryExposureKey:  key,
-				RollingStartNumber:    rollingStartNumber,
-				TransmissionRiskLevel: buf[0],
-			})
+		got, err := diag.ParseDiagnosisKeyFile(resp.Body)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		if !reflect.DeepEqual(got, expDiagKeys) {
@@ -260,15 +219,18 @@ func TestListDiagnosisKeys(t *testing.T) {
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:   42,
 					},
 					{
 						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:   42,
 					},
 				},
 				expStatusCode: 200,
 				expDiagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:   42,
 					},
 				},
 			},
@@ -278,9 +240,11 @@ func TestListDiagnosisKeys(t *testing.T) {
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:   42,
 					},
 					{
 						TemporaryExposureKey: [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+						RollingStartNumber:   42,
 					},
 				},
 				expStatusCode: 200,
@@ -292,6 +256,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 				diagKeys: []diag.DiagnosisKey{
 					{
 						TemporaryExposureKey: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+						RollingStartNumber:   42,
 					},
 				},
 				expStatusCode: 200,
@@ -303,10 +268,8 @@ func TestListDiagnosisKeys(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				cfg := &diag.Config{
 					Repository: testRepository{
-						findAllDiagnosisKeysFn: func(_ context.Context) ([]byte, error) {
-							buf := &bytes.Buffer{}
-							diag.WriteDiagnosisKeys(buf, tt.diagKeys...)
-							return buf.Bytes(), nil
+						findAllDiagnosisKeysFn: func(_ context.Context) ([]diag.DiagnosisKey, error) {
+							return tt.diagKeys, nil
 						},
 						lastModifiedFn: noopRepo.lastModifiedFn,
 					},
@@ -336,31 +299,9 @@ func TestListDiagnosisKeys(t *testing.T) {
 					}
 				}
 
-				var got []diag.DiagnosisKey
-
-				for {
-					var key [16]byte
-					_, err := io.ReadFull(resp.Body, key[:])
-					if err == io.EOF {
-						break
-					}
-					if err != nil {
-						t.Fatal(err)
-					}
-
-					var rollingStartNumber uint32
-					err = binary.Read(resp.Body, binary.BigEndian, &rollingStartNumber)
-					if err != nil {
-						t.Fatal(err)
-					}
-					buf := make([]byte, 1)
-					_, err = resp.Body.Read(buf)
-
-					got = append(got, diag.DiagnosisKey{
-						TemporaryExposureKey:  key,
-						RollingStartNumber:    rollingStartNumber,
-						TransmissionRiskLevel: buf[0],
-					})
+				got, err := diag.ParseDiagnosisKeyFile(resp.Body)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if !reflect.DeepEqual(got, tt.expDiagKeys) {
@@ -372,7 +313,7 @@ func TestListDiagnosisKeys(t *testing.T) {
 }
 
 func TestPostDiagnosisKeys(t *testing.T) {
-	t.Run("missing post body", func(t *testing.T) {
+	t.Run("missing request body", func(t *testing.T) {
 		handler := newTestHandler(t, nil)
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", nil)
 		w := httptest.NewRecorder()
@@ -385,7 +326,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expBody := "Invalid body: unexpected EOF"
+		expBody := "Missing request body"
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
@@ -410,45 +351,24 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expBody := "Invalid body: unexpected EOF"
+		expBody := `Invalid body: diag: could not decode protobuf: proto: invalid field number`
 		resBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if got := strings.TrimSpace(string(resBody)); got != expBody {
-			t.Errorf("expected: %v, got: `%s`", expBody, got)
+			t.Errorf("expected: `%s`, got: `%s`", expBody, got)
 		}
 	})
 
-	t.Run("too many diagnosis keys", func(t *testing.T) {
-		diagKey := diag.DiagnosisKey{
-			TemporaryExposureKey: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-			RollingStartNumber:   uint32(42),
-		}
-
+	t.Run("request body too large", func(t *testing.T) {
 		cfg := &diag.Config{
-			Repository:         noopRepo,
-			MaxUploadBatchSize: 7,
+			Repository: noopRepo,
 		}
 		handler := newTestHandler(t, cfg)
 
-		buf := &bytes.Buffer{}
-		for i := 0; i < int(cfg.MaxUploadBatchSize)+1; i++ {
-			_, err := buf.Write(diagKey.TemporaryExposureKey[:])
-			if err != nil {
-				panic(err)
-			}
-			err = binary.Write(buf, binary.BigEndian, diagKey.RollingStartNumber)
-			if err != nil {
-				panic(err)
-			}
-			err = binary.Write(buf, binary.BigEndian, diagKey.TransmissionRiskLevel)
-			if err != nil {
-				panic(err)
-			}
-		}
-
+		buf := bytes.NewBuffer(make([]byte, diag.MaxUploadSize+1))
 		req := httptest.NewRequest("POST", "http://example.com/diagnosis-keys", buf)
 		w := httptest.NewRecorder()
 
@@ -460,7 +380,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expBody := "Invalid body: http: request body too large"
+		expBody := "Invalid body: diag: could not read diagnosis keys: http: request body too large"
 		resBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
@@ -481,21 +401,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 
 		validBody := func() *bytes.Buffer {
 			buf := &bytes.Buffer{}
-			for _, expDiagKey := range expDiagKeys {
-				_, err := buf.Write(expDiagKey.TemporaryExposureKey[:])
-				if err != nil {
-					panic(err)
-				}
-				err = binary.Write(buf, binary.BigEndian, expDiagKey.RollingStartNumber)
-				if err != nil {
-					panic(err)
-				}
-				err = binary.Write(buf, binary.BigEndian, expDiagKey.TransmissionRiskLevel)
-				if err != nil {
-					panic(err)
-				}
-			}
-
+			diag.WriteDiagnosisKeyProtobuf(buf, expDiagKeys...)
 			return buf
 		}
 

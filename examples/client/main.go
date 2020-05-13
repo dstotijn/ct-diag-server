@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/binary"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -58,7 +57,7 @@ func listDiagnosisKeys(baseURL string) {
 	}
 	defer resp.Body.Close()
 
-	diagKeys, err := diag.ParseDiagnosisKeys(resp.Body)
+	diagKeys, err := diag.ParseDiagnosisKeyFile(resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,19 +74,9 @@ func postDiagnosisKeys(baseURL string, batchSize int) {
 	diagKeys := diagnosisKeys(batchSize)
 
 	buf := &bytes.Buffer{}
-	for _, diagKey := range diagKeys {
-		_, err := buf.Write(diagKey.TemporaryExposureKey[:])
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = binary.Write(buf, binary.BigEndian, diagKey.RollingStartNumber)
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, err = buf.Write([]byte{diagKey.TransmissionRiskLevel})
-		if err != nil {
-			log.Fatal(err)
-		}
+	_, err := diag.WriteDiagnosisKeyProtobuf(buf, diagKeys...)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	req, err := http.NewRequest("POST", baseURL+"/diagnosis-keys", buf)

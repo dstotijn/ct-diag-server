@@ -19,13 +19,11 @@ func main() {
 	ctx := context.Background()
 
 	var (
-		addr               string
-		maxUploadBatchSize uint
-		isDev              bool
-		cacheInterval      time.Duration
+		addr          string
+		isDev         bool
+		cacheInterval time.Duration
 	)
 	flag.StringVar(&addr, "addr", ":80", "HTTP listen address")
-	flag.UintVar(&maxUploadBatchSize, "maxUploadBatchSize", 14, "Maximum upload batch size")
 	flag.BoolVar(&isDev, "dev", false, "Boolean indicating whether the app is running in a dev environment")
 	flag.DurationVar(&cacheInterval, "cacheInterval", 5*time.Minute, "Interval between cache refresh")
 	flag.Parse()
@@ -61,12 +59,11 @@ func main() {
 	}
 
 	cfg := diag.Config{
-		Repository:         db,
-		Cache:              &diag.MemoryCache{},
-		CacheInterval:      cacheInterval,
-		MaxUploadBatchSize: maxUploadBatchSize,
-		ExposureConfig:     exposureCfg,
-		Logger:             logger,
+		Repository:     db,
+		Cache:          &diag.MemoryCache{},
+		CacheInterval:  cacheInterval,
+		ExposureConfig: exposureCfg,
+		Logger:         logger,
 	}
 	handler, err := api.NewHandler(ctx, cfg, logger)
 	if err != nil {
