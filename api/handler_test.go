@@ -351,7 +351,7 @@ func TestPostDiagnosisKeys(t *testing.T) {
 			t.Errorf("expected: %v, got: %v", expStatusCode, got)
 		}
 
-		expBody := "Invalid body: diag: could not decode protobuf: proto: invalid field number"
+		expBody := "Invalid body: diag: could not decode protobuf: proto: invalid field number"
 		resBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
