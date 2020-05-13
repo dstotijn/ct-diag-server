@@ -178,15 +178,20 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			name: "diagnosis keys in database",
 			diagKeys: []diag.DiagnosisKey{
 				{
-					TemporaryExposureKey: key,
-					RollingStartNumber:   uint32(42),
-					UploadedAt:           now,
+					TemporaryExposureKey:  key,
+					RollingStartNumber:    42,
+					RollingPeriod:         43,
+					TransmissionRiskLevel: 44,
+					UploadedAt:            now,
 				},
 			},
 			expDiagKeys: []diag.DiagnosisKey{
 				{
-					TemporaryExposureKey: key,
-					RollingStartNumber:   uint32(42),
+					TemporaryExposureKey:  key,
+					RollingStartNumber:    42,
+					RollingPeriod:         43,
+					TransmissionRiskLevel: 44,
+					UploadedAt:            now,
 				},
 			},
 			expError: nil,
@@ -201,7 +206,7 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4)")
+			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, rolling_period, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4, $5)")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -211,6 +216,7 @@ func TestFindAllDiagnosisKeys(t *testing.T) {
 				_, err = stmt.ExecContext(ctx,
 					diagKey.TemporaryExposureKey[:],
 					diagKey.RollingStartNumber,
+					diagKey.RollingPeriod,
 					diagKey.TransmissionRiskLevel,
 					diagKey.UploadedAt,
 				)
@@ -301,7 +307,7 @@ func TestLastModified(t *testing.T) {
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4)")
+			stmt, err := tx.PrepareContext(ctx, "INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, rolling_period, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4, $5)")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -311,6 +317,7 @@ func TestLastModified(t *testing.T) {
 				_, err = stmt.ExecContext(ctx,
 					storeReq.diagKey.TemporaryExposureKey[:],
 					storeReq.diagKey.RollingStartNumber,
+					storeReq.diagKey.RollingPeriod,
 					storeReq.diagKey.TransmissionRiskLevel,
 					storeReq.lastModified,
 				)

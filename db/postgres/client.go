@@ -59,7 +59,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4)
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO diagnosis_keys (temporary_exposure_key, rolling_start_number, rolling_period, transmission_risk_level, uploaded_at) VALUES ($1, $2, $3, $4, $5)
 	ON CONFLICT ON CONSTRAINT diagnosis_keys_pkey DO NOTHING`)
 	if err != nil {
 		return fmt.Errorf("postgres: could not prepare statement: %v", err)
@@ -70,6 +70,7 @@ func (c *Client) StoreDiagnosisKeys(ctx context.Context, diagKeys []diag.Diagnos
 		_, err = stmt.ExecContext(ctx,
 			diagKey.TemporaryExposureKey[:],
 			diagKey.RollingStartNumber,
+			diagKey.RollingPeriod,
 			diagKey.TransmissionRiskLevel,
 			uploadedAt,
 		)
@@ -91,7 +92,7 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 	// Reduce the amount of allocs by anticipating the needed slice capacity.
 	diagKeys := make([]diag.DiagnosisKey, 0, c.lastKnownKeyCount)
 
-	query := `SELECT temporary_exposure_key, rolling_start_number, transmission_risk_level
+	query := `SELECT temporary_exposure_key, rolling_start_number, rolling_period, transmission_risk_level, uploaded_at
 	FROM diagnosis_keys
 	ORDER BY index ASC`
 
@@ -106,7 +107,13 @@ func (c *Client) FindAllDiagnosisKeys(ctx context.Context) ([]diag.DiagnosisKey,
 		rowCount++
 		var diagKey diag.DiagnosisKey
 		key := diagKey.TemporaryExposureKey[:0]
-		err := rows.Scan(&key, &diagKey.RollingStartNumber, &diagKey.TransmissionRiskLevel)
+		err := rows.Scan(
+			&key,
+			&diagKey.RollingStartNumber,
+			&diagKey.RollingPeriod,
+			&diagKey.TransmissionRiskLevel,
+			&diagKey.UploadedAt,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("postgres: could not scan row: %v", err)
 		}

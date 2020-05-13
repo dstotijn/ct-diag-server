@@ -32,6 +32,7 @@ var (
 // @see https://developer.apple.com/documentation/exposurenotification/entemporaryexposurekey
 type DiagnosisKey struct {
 	TemporaryExposureKey  [16]byte
+	RollingPeriod         uint32
 	RollingStartNumber    uint32
 	TransmissionRiskLevel byte
 	UploadedAt            time.Time
